@@ -80,6 +80,7 @@ class KTOTrainer(ABC):
                 entity=strategy.args.wandb_org,
                 project=strategy.args.wandb_project,
                 id=strategy.args.wandb_id,
+                resume=strategy.args.wandb_resume,
                 group=strategy.args.wandb_group,
                 name=strategy.args.wandb_run_name,
                 config=strategy.args.__dict__,
