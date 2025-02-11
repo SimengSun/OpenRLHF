@@ -292,7 +292,8 @@ class NaiveExperienceMaker(ABC):
         Turn samples into experience by calculating logprobs, values, rewards, and kl divergence.
         """
         self.actor.eval()
-        self.initial_model.eval()
+        if self.initial_model is not None:
+            self.initial_model.eval()
         if self.reward_model is not None:
             self.reward_model.eval()
         if self.critic is not None:
@@ -308,7 +309,7 @@ class NaiveExperienceMaker(ABC):
         action_log_probs = self.actor(sequences, num_actions, attention_mask)
 
         # init log probs
-        base_action_log_probs = self.initial_model(sequences, num_actions, attention_mask)
+        base_action_log_probs = self.initial_model(sequences, num_actions, attention_mask) if self.initial_model is not None else None
 
         # values
         if self.critic is not None:
@@ -330,12 +331,15 @@ class NaiveExperienceMaker(ABC):
             # local RM
             r = self.reward_model(sequences, attention_mask)
 
-        kl = compute_approx_kl(
-            action_log_probs,
-            base_action_log_probs,
-            action_mask=action_mask,
-            use_kl_estimator_k3=self.strategy.args.use_kl_estimator_k3,
-        )
+        if self.initial_model is not None:
+            kl = compute_approx_kl(
+                action_log_probs,
+                base_action_log_probs,
+                action_mask=action_mask,
+                use_kl_estimator_k3=self.strategy.args.use_kl_estimator_k3,
+            )
+        else:
+            kl = torch.zeros_like(action_log_probs)
 
         info = {
             "kl": masked_mean(kl, action_mask, dim=-1),
@@ -546,9 +550,10 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         )
 
         # init log probs
-        base_action_log_probs_ref = self.initial_model.forward.remote(
-            sequences_cpu, num_actions, attention_mask_cpu, packed_seq_lens=packed_seq_lens
-        )
+        if self.initial_model is not None:
+            base_action_log_probs_ref = self.initial_model.forward.remote(
+                sequences_cpu, num_actions, attention_mask_cpu, packed_seq_lens=packed_seq_lens
+            ) if self.initial_model is not None else None
 
         # values
         if self.critic is not None:
@@ -562,7 +567,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         else:
             value_ref = ray.put(None)
 
-        if self.strategy.args.colocate_actor_ref:
+        if self.strategy.args.colocate_actor_ref and (self.initial_model is not None):
             ray.get([base_action_log_probs_ref])
             ray.get([self.initial_model.empty_cache.remote()])
 
@@ -599,11 +604,17 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
 
         # wait initial/critic/reward model done
         start = time.time()
-        ref_values = ray.get([base_action_log_probs_ref, value_ref] + r_refs)
+        if self.initial_model is not None:
+            ref_values = ray.get([base_action_log_probs_ref, value_ref] + r_refs)
+        else:
+            ref_values = ray.get([value_ref] + r_refs)
         wait_time = time.time() - start
 
-        base_action_log_probs, value, rewards = ref_values[0], ref_values[1], ref_values[2:]
-        base_action_log_probs = base_action_log_probs.to(device)
+        if self.initial_model is not None:
+            base_action_log_probs, value, rewards = ref_values[0], ref_values[1], ref_values[2:]
+            base_action_log_probs = base_action_log_probs.to(device)
+        else:
+            value, rewards = ref_values[0], ref_values[1:]
         if value is not None:
             value = value.to(device)
         rewards = [r.to(device) for r in rewards]
@@ -616,12 +627,15 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         if self.strategy.args.colocate_actor_ref:
             torch.cuda.empty_cache()
 
-        kl = compute_approx_kl(
-            action_log_probs,
-            base_action_log_probs,
-            action_mask=action_mask,
-            use_kl_estimator_k3=self.strategy.args.use_kl_estimator_k3,
-        )
+        if self.initial_model is not None:
+            kl = compute_approx_kl(
+                action_log_probs,
+                base_action_log_probs,
+                action_mask=action_mask,
+                use_kl_estimator_k3=self.strategy.args.use_kl_estimator_k3,
+            )
+        else:
+            kl = torch.zeros_like(action_log_probs)
 
         if not self.packing_samples:
             kl_mean = masked_mean(kl, action_mask, dim=-1)

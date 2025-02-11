@@ -51,6 +51,10 @@ def train(args):
 
     # if colocated, create placement group for actor and ref model explicitly.
     pg = None
+
+    if args.init_kl_coef == 0:
+        args.colocate_actor_ref = False
+
     if args.colocate_actor_ref:
         assert (
             args.actor_num_nodes == args.ref_num_nodes and args.actor_num_gpus_per_node == args.ref_num_gpus_per_node
@@ -72,6 +76,7 @@ def train(args):
     # So 0.75/0.25 gpu is a tricky to let Ray spread all models evenly on all gpus.
     #   |actor| ref  |actor| ref  |actor| ref  |actor|ref  |
     #   |GPU0 | GPU0 |GPU1 | GPU1 |GPU2 | GPU2 |GPU3 | GPU3 |
+
     actor_model = PPORayActorGroup(
         args.actor_num_nodes,
         args.actor_num_gpus_per_node,
@@ -80,13 +85,15 @@ def train(args):
         num_gpus_per_actor=0.75 if pg else 1,
     )
 
-    ref_model = PPORayActorGroup(
-        args.ref_num_nodes,
-        args.ref_num_gpus_per_node,
-        ReferenceModelRayActor,
-        pg=pg,
-        num_gpus_per_actor=0.25 if pg else 1,
-    )
+    ref_model = None
+    if args.init_kl_coef != 0:
+        ref_model = PPORayActorGroup(
+            args.ref_num_nodes,
+            args.ref_num_gpus_per_node,
+            ReferenceModelRayActor,
+            pg=pg,
+            num_gpus_per_actor=0.25 if pg else 1,
+        )
 
     # if colocated, create placement group for critic and reward model explicitly.
     pg = None
@@ -133,7 +140,8 @@ def train(args):
 
     # init reference/reward/actor model
     refs = []
-    refs.extend(ref_model.async_init_model_from_pretrained(strategy, args.pretrain))
+    if args.init_kl_coef != 0:
+        refs.extend(ref_model.async_init_model_from_pretrained(strategy, args.pretrain))
     refs.extend(actor_model.async_init_model_from_pretrained(strategy, args.pretrain))
     if not args.remote_rm_url:
         for reward_model, reward_pretrain in zip(reward_models, reward_pretrains):
