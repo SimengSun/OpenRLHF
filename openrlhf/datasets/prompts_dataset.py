@@ -47,9 +47,10 @@ class PromptDataset(Dataset):
 
         self.prompts = []
         self.prompt_metadata = []
-        for data in tqdm(dataset, desc="Preprocessing data", disable=not self.strategy.is_rank_0()):
+        for i, data in tqdm(enumerate(dataset), desc="Preprocessing data", disable=not self.strategy.is_rank_0()):
             prompt = preprocess_data(data, input_template, input_key, apply_chat_template)
             data.pop(input_key)
+            data['_idx'] = i
             self.prompt_metadata.append(data)
             self.prompts.append(prompt)
 

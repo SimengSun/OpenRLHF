@@ -5,6 +5,7 @@ from typing import List
 import ray
 import torch
 from ray.util.placement_group import placement_group
+from pprint import pprint
 
 from openrlhf.trainer.ray import (
     ActorModelRayActor,
@@ -369,7 +370,14 @@ if __name__ == "__main__":
     # performance tuning
     parser.add_argument("--perf", action="store_true", default=False)
 
+    parser.add_argument("--extra_args", type=str, default=None)
+
     args = parser.parse_args()
+
+    args.extra_args = json.loads(args.extra_args) if args.extra_args is not None else {}
+
+    print('Extra Args:')
+    pprint(args.extra_args)
 
     if args.advantage_estimator not in ["gae"]:
         args.critic_pretrain = None
