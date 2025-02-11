@@ -490,7 +490,7 @@ class PPOTrainer(ABC):
                 for i, experience in enumerate(
                     self.experience_maker.make_experience_list(prompts, **self.generate_kwargs)
                 ):
-                    self.eval_buffer['reward'].extend(experience.info)
+                    self.eval_buffer['reward'].extend(experience.info['reward'])
                     pbar.update()
 
             logs_dict = {
