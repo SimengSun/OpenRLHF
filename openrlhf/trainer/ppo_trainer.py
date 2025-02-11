@@ -492,8 +492,10 @@ class PPOTrainer(ABC):
                 ):
                     self.eval_buffer['reward'].extend(experience.info)
                     pbar.update()
-            logs_dict = {'foo': 0.9 + random.random() * 0.2}
-            logs_dict.update({'reward': torch.stack(self.eval_buffer['reward']).mean()})
+
+            logs_dict = {
+                'reward': torch.stack(self.eval_buffer['reward']).mean()
+            }
             return logs_dict
 
     def save_logs_and_checkpoints(self, args, global_step, step_bar, logs_dict={}, client_states={}):
