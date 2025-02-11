@@ -6,6 +6,7 @@ import ray
 import torch
 from ray.util.placement_group import placement_group
 from pprint import pprint
+import json
 
 from openrlhf.trainer.ray import (
     ActorModelRayActor,
