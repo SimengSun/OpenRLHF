@@ -483,6 +483,7 @@ class ActorModelRayActor(BasePPORole):
             args,
             self.prompts_dataloader,
             self.pretrain_dataloader,
+            self.eval_dataloader,
             self.consumed_samples,
             self.num_update_steps_per_episodes,
         )

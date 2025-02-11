@@ -193,6 +193,7 @@ class PPOTrainer(ABC):
         args,
         prompts_dataloader,
         pretrain_dataloader,
+        eval_dataloader,
         consumed_samples=0,
         num_update_steps_per_episodes=1,
     ) -> None:
@@ -212,6 +213,7 @@ class PPOTrainer(ABC):
 
         self.prompts_dataloader = prompts_dataloader
         self.pretrain_dataloader = pretrain_dataloader
+        self.eval_dataloader = eval_dataloader
 
         # Restore step and start_epoch
         steps = consumed_samples // args.rollout_batch_size + 1

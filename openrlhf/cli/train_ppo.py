@@ -120,17 +120,20 @@ def train(args):
         critic_optim = None
 
     # prepare datasets
-    prompts_data = blending_datasets(
+    prompts_data, eval_data = blending_datasets(
         args.prompt_data,
         args.prompt_data_probs,
         strategy,
         args.seed,
         max_count=args.max_samples,
-        return_eval=False,
+        # return_eval=False,
+        return_eval=True,
         train_split=args.prompt_split,
     )
     prompts_data = prompts_data.select(range(min(args.max_samples, len(prompts_data))))
     prompts_dataset = PromptDataset(prompts_data, tokenizer, strategy, input_template=args.input_template)
+
+    eval_dataset = PromptDataset(eval_data, tokenizer, strategy, input_template=args.input_template)
 
     if args.pretrain_data:
         pretrain_data = blending_datasets(
@@ -155,6 +158,9 @@ def train(args):
     # prepare dataloader
     prompts_dataloader = strategy.setup_dataloader(
         prompts_dataset, args.rollout_batch_size // strategy.world_size, True, True
+    )
+    eval_dataloader  = strategy.setup_dataloader(
+        eval_dataset, args.rollout_batch_size // strategy.world_size, pin_memory=True, shuffle=False,
     )
     if args.pretrain_data:
         pretrain_dataloader = itertools.cycle(
@@ -266,7 +272,7 @@ def train(args):
         disable_ds_ckpt=args.disable_ds_ckpt,
     )
 
-    trainer.fit(args, prompts_dataloader, pretrain_dataloader, consumed_samples, num_update_steps_per_episodes)
+    trainer.fit(args, prompts_dataloader, pretrain_dataloader, eval_dataloader, consumed_samples, num_update_steps_per_episodes)
 
     # save model checkpoint after fitting on only rank0
     strategy.save_model(
