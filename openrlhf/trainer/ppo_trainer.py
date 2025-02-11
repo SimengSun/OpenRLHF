@@ -479,11 +479,19 @@ class PPOTrainer(ABC):
             # import random
             from collections import defaultdict
             self.eval_buffer = defaultdict(list)
+
+            pbar = tqdm(
+                range(dataloader.__len__()),
+                desc=f"Eval global step [{global_step}]",
+                disable=not self.strategy.is_rank_0(),
+            )
+
             for prompts in dataloader:
                 for i, experience in enumerate(
                     self.experience_maker.make_experience_list(prompts, **self.generate_kwargs)
                 ):
                     self.eval_buffer['reward'].extend(experience.info)
+                    pbar.update()
             logs_dict = {'foo': 0.9 + random.random() * 0.2}
             logs_dict.update({'reward': torch.stack(self.eval_buffer['reward']).mean()})
             return logs_dict
