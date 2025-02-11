@@ -498,6 +498,19 @@ class PPOTrainer(ABC):
         # TODO: Add evaluation mechanism for PPO
         if global_step % args.eval_steps == 0:
             # self.evaluate(self.eval_dataloader, global_step)
+            import random
+            logs_dict = {'foo': 0.9 + random.random() * 0.2}
+            if self._wandb is not None and self.strategy.is_rank_0():
+                logs = {
+                    "eval/%s" % k: v
+                    for k, v in {
+                        **logs_dict,
+                        "global_step": global_step,
+                    }.items()
+                }
+                # if self.experience_maker.perf_stats is not None:
+                #     logs.update({f"perf/experience_maker/{k}": v for k, v in self.experience_maker.perf_stats.items()})
+                self._wandb.log(logs)
             pass
         # save ckpt
         # TODO: save best model on dev, use loss/perplexity/others on whole dev dataset as metric
