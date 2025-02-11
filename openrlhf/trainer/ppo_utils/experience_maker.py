@@ -156,6 +156,7 @@ class NaiveExperienceMaker(ABC):
         if remote_rm_url and remote_rm_url[0].endswith(".py"):
             print(f"Loading custom `reward_func(queries, prompts)` from {remote_rm_url[0]}")
             import importlib.util
+            import inspect
 
             spec = importlib.util.spec_from_file_location("reward_func", remote_rm_url[0])
             reward_module = importlib.util.module_from_spec(spec)
