@@ -177,8 +177,8 @@ class PPOTrainer(ABC):
 
             wandb.define_metric("train/global_step")
             wandb.define_metric("train/*", step_metric="train/global_step", step_sync=True)
-            wandb.define_metric("eval/epoch")
-            wandb.define_metric("eval/*", step_metric="eval/epoch", step_sync=True)
+            wandb.define_metric("eval/global_step")
+            wandb.define_metric("eval/*", step_metric="eval/global_step", step_sync=True)
 
         # Initialize TensorBoard writer if wandb is not available
         if self.strategy.args.use_tensorboard and self._wandb is None and self.strategy.is_rank_0():
@@ -476,9 +476,8 @@ class PPOTrainer(ABC):
         return status
 
     def evaluate(self, dataloader, global_step):
-            # import random
             from collections import defaultdict
-            self.eval_buffer = defaultdict(list)
+            eval_buffer = defaultdict(list)
 
             pbar = tqdm(
                 range(dataloader.__len__()),
@@ -490,11 +489,11 @@ class PPOTrainer(ABC):
                 for i, experience in enumerate(
                     self.experience_maker.make_experience_list(prompts, **self.generate_kwargs)
                 ):
-                    self.eval_buffer['reward'].extend(experience.info['reward'])
+                    eval_buffer['reward'].extend(experience.info['reward'])
                     pbar.update()
 
             logs_dict = {
-                'reward': torch.stack(self.eval_buffer['reward']).mean()
+                'reward': torch.stack(eval_buffer['reward']).mean().item()
             }
             return logs_dict
 
@@ -540,7 +539,6 @@ class PPOTrainer(ABC):
                 # if self.experience_maker.perf_stats is not None:
                 #     logs.update({f"perf/experience_maker/{k}": v for k, v in self.experience_maker.perf_stats.items()})
                 self._wandb.log(logs)
-            pass
 
     def _save_checkpoint(self, args, tag, client_states):
         if not self.disable_ds_ckpt:
