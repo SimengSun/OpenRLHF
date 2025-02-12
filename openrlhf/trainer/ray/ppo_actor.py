@@ -354,6 +354,29 @@ class ActorModelRayActor(BasePPORole):
             self.prompts_dataset, args.rollout_batch_size // strategy.world_size, True, True, collate_fn=custom_collate_fn,
         )
 
+        if args.eval_data:
+            eval_data = blending_datasets(
+                args.eval_data,
+                args.eval_data_probs,
+                strategy,
+                args.seed,
+                return_eval=False,
+            )
+
+            if args.limit_val_batches is not None:
+                samples_per_batch = args.rollout_batch_size // strategy.world_size
+                samples_in_limited_batches = args.limit_val_batches * samples_per_batch
+                eval_data = eval_data.select(range(min(samples_in_limited_batches, len(eval_data))))
+
+            self.eval_dataset = PromptDataset(
+                eval_data, self.tokenizer, strategy, input_template=args.input_template
+            )
+            self.eval_dataloader = strategy.setup_dataloader(
+                self.eval_dataset, args.rollout_batch_size // strategy.world_size, pin_memory=True, shuffle=False,
+            )
+        else:
+            self.eval_dataloader = None
+
         if args.pretrain_data:
             pretrain_data = blending_datasets(
                 args.pretrain_data,
@@ -465,6 +488,7 @@ class ActorModelRayActor(BasePPORole):
             self.pretrain_dataloader,
             self.consumed_samples,
             self.num_update_steps_per_episodes,
+            eval_dataloader=self.eval_dataloader,
         )
 
     def save_model(self):
