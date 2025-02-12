@@ -371,7 +371,7 @@ if __name__ == "__main__":
     # performance tuning
     parser.add_argument("--perf", action="store_true", default=False)
 
-    parser.add_argument("--extra_args", type=str, default=None)
+    parser.add_argument("--extra_args", type=str, default="{}")
 
     args = parser.parse_args()
 
