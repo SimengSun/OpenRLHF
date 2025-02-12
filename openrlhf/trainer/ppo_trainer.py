@@ -193,9 +193,9 @@ class PPOTrainer(ABC):
         args,
         prompts_dataloader,
         pretrain_dataloader,
-        eval_dataloader,
         consumed_samples=0,
         num_update_steps_per_episodes=1,
+        eval_dataloader=None,
     ) -> None:
         num_rollouts_per_episodes = (
             num_update_steps_per_episodes
@@ -526,7 +526,7 @@ class PPOTrainer(ABC):
             self._save_checkpoint(args, tag, client_states)
 
         # Run eval after check for checkpoint  save in case checkpoint save comes at the end of the job
-        if global_step % args.eval_steps == 0:
+        if global_step % args.eval_steps == 0 and self.eval_dataloader is not None:
             logs_dict = self.evaluate(self.eval_dataloader, global_step)
             if self._wandb is not None and self.strategy.is_rank_0():
                 logs = {
