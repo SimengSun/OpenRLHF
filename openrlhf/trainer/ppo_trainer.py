@@ -536,8 +536,6 @@ class PPOTrainer(ABC):
                         "global_step": global_step,
                     }.items()
                 }
-                # if self.experience_maker.perf_stats is not None:
-                #     logs.update({f"perf/experience_maker/{k}": v for k, v in self.experience_maker.perf_stats.items()})
                 self._wandb.log(logs)
 
     def _save_checkpoint(self, args, tag, client_states):
