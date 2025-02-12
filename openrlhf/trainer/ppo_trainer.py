@@ -1,6 +1,7 @@
 import os
 import os.path
 from abc import ABC
+from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional
 
 import torch
@@ -476,7 +477,6 @@ class PPOTrainer(ABC):
         return status
 
     def evaluate(self, dataloader, global_step):
-            from collections import defaultdict
             eval_buffer = defaultdict(list)
 
             pbar = tqdm(
