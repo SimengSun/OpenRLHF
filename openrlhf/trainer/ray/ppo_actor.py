@@ -356,7 +356,6 @@ class ActorModelRayActor(BasePPORole):
                 strategy,
                 args.seed,
                 return_eval=False,
-                train_split=args.eval_split,
             )
 
             if args.limit_val_batches is not None:
