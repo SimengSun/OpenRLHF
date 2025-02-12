@@ -15,7 +15,7 @@ tensorboard
 torch
 torchmetrics
 tqdm
-transformers
+transformers==4.46.0  # ring attention is broken in higher versions
 transformers_stream_generator
 wandb
 wheel
