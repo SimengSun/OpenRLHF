@@ -375,7 +375,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    args.extra_args = json.loads(args.extra_args) if args.extra_args is not None else {}
+    args.extra_args = json.loads(args.extra_args)
 
     print('Extra Args:')
     pprint(args.extra_args)
