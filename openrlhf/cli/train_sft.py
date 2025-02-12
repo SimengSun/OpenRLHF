@@ -44,17 +44,39 @@ def train(args):
     optim = strategy.create_optimizer(model, lr=args.learning_rate, betas=args.adam_betas, weight_decay=args.l2)
 
     # prepare for data and dataset
-    train_data, eval_data = blending_datasets(
-        args.dataset,
-        args.dataset_probs,
-        strategy,
-        args.seed,
-        max_count=args.max_samples,
-        train_split=args.train_split,
-        eval_split=args.eval_split,
-    )
+    if args.eval_data is None:
+        train_data, eval_data = blending_datasets(
+            args.dataset,
+            args.dataset_probs,
+            strategy,
+            args.seed,
+            max_count=args.max_samples,
+            train_split=args.train_split,
+            eval_split=args.eval_split,
+        )
+    else:
+        train_data = blending_datasets(
+            args.dataset,
+            args.dataset_probs,
+            strategy,
+            args.seed,
+            max_count=args.max_samples,
+            return_eval=False,
+        )
+        eval_data = blending_datasets(
+            args.eval_data,
+            args.eval_data_probs,
+            strategy,
+            args.seed,
+            max_count=args.max_samples,
+            return_eval=False,
+        )
+    eval_data_bounds = [args.max_samples, len(eval_data)]
+    if args.limit_val_batches is not None:
+        eval_data_bounds.append(args.limit_val_batches * args.train_batch_size)
+
     train_data = train_data.select(range(min(args.max_samples, len(train_data))))
-    eval_data = eval_data.select(range(min(args.max_samples, len(eval_data))))
+    eval_data = eval_data.select(range(min(*eval_data_bounds)))
     train_dataset = SFTDataset(
         train_data,
         tokenizer,
@@ -208,6 +230,9 @@ if __name__ == "__main__":
     # custom dataset
     parser.add_argument("--dataset", type=str, default=None)
     parser.add_argument("--dataset_probs", type=str, default="1.0", help="sampling probs for datasets")
+    parser.add_argument("--eval_data", type=str, default=None)
+    parser.add_argument("--eval_data_probs", type=str, default="1.0", help="sampling probs for eval datasets")
+    parser.add_argument("--limit_val_batches", type=int, default=None, help="Number of batches of validation to run")
     parser.add_argument("--train_split", type=str, default="train", help="train split of the HF dataset")
     parser.add_argument("--eval_split", type=str, default="test", help="test split of the dataset")
     parser.add_argument("--multiturn", action="store_true", default=False, help="Use compacted multiturn dataset")
