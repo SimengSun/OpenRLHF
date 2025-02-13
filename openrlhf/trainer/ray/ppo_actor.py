@@ -371,8 +371,10 @@ class ActorModelRayActor(BasePPORole):
             self.eval_dataset = PromptDataset(
                 eval_data, self.tokenizer, strategy, input_template=args.input_template
             )
+            strategy.print(f'Number of samples in eval dataset: {len(self.eval_dataset)}')
             self.eval_dataloader = strategy.setup_dataloader(
                 self.eval_dataset, args.rollout_batch_size // strategy.world_size, pin_memory=True, shuffle=False,
+                collate_fn=custom_collate_fn,
             )
         else:
             self.eval_dataloader = None
