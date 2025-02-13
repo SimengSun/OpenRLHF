@@ -255,7 +255,7 @@ class PPOTrainer(ABC):
                 pbar.set_postfix(status)
 
                 # logs/checkpoints
-                client_states = {"consumed_samples": (global_consumed_samples := steps * args.rollout_batch_size * n_samples_per_prompt)}
+                client_states = {"consumed_samples": (global_consumed_samples := steps * args.rollout_batch_size * args.n_samples_per_prompt)}
                 status["consumed_samples"] = global_consumed_samples
                 self.save_logs_and_checkpoints(args, steps, pbar, status, client_states)
 
