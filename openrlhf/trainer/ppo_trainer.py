@@ -476,7 +476,7 @@ class PPOTrainer(ABC):
         }
         return status
 
-    def evaluate(self, args, dataloader, global_step):
+    def evaluate(self, dataloader, global_step, extra_rm_args):
             eval_buffer = defaultdict(list)
 
             pbar = tqdm(
@@ -488,7 +488,7 @@ class PPOTrainer(ABC):
             logs_dict = {}
             for prompts, input_dict in dataloader:
                 for i, experience in enumerate(
-                    self.experience_maker.make_experience_list(args.extra_rm_args, (prompts, input_dict), **self.generate_kwargs)
+                    self.experience_maker.make_experience_list(extra_rm_args, (prompts, input_dict), **self.generate_kwargs)
                 ):
                     eval_buffer['reward'].extend(experience.info['reward'])
                     pbar.update()
@@ -527,7 +527,7 @@ class PPOTrainer(ABC):
 
         # Run eval after check for checkpoint  save in case checkpoint save comes at the end of the job
         if global_step % args.eval_steps == 0 and self.eval_dataloader is not None:
-            logs_dict = self.evaluate(args, self.eval_dataloader, global_step)
+            logs_dict = self.evaluate(self.eval_dataloader, global_step, args.extra_rm_args)
             if self._wandb is not None and self.strategy.is_rank_0():
                 logs = {
                     "eval/%s" % k: v
