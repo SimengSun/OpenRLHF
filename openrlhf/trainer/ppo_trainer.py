@@ -476,7 +476,7 @@ class PPOTrainer(ABC):
         }
         return status
 
-    def evaluate(self, dataloader, global_step):
+    def evaluate(self, args, dataloader, global_step):
             eval_buffer = defaultdict(list)
 
             pbar = tqdm(
@@ -485,16 +485,16 @@ class PPOTrainer(ABC):
                 disable=not self.strategy.is_rank_0(),
             )
 
-            for prompts in dataloader:
+            logs_dict = {}
+            for prompts, input_dict in dataloader:
                 for i, experience in enumerate(
-                    self.experience_maker.make_experience_list(prompts, **self.generate_kwargs)
+                    self.experience_maker.make_experience_list(args.extra_rm_args, (prompts, input_dict), **self.generate_kwargs)
                 ):
                     eval_buffer['reward'].extend(experience.info['reward'])
                     pbar.update()
 
-            logs_dict = {
-                'reward': torch.stack(eval_buffer['reward']).mean().item()
-            }
+            if len(eval_buffer['reward']) > 0:
+                logs_dict['reward'] = torch.stack(eval_buffer['reward']).mean().item()
             return logs_dict
 
     def save_logs_and_checkpoints(self, args, global_step, step_bar, logs_dict={}, client_states={}):
@@ -527,7 +527,7 @@ class PPOTrainer(ABC):
 
         # Run eval after check for checkpoint  save in case checkpoint save comes at the end of the job
         if global_step % args.eval_steps == 0 and self.eval_dataloader is not None:
-            logs_dict = self.evaluate(self.eval_dataloader, global_step)
+            logs_dict = self.evaluate(args, self.eval_dataloader, global_step)
             if self._wandb is not None and self.strategy.is_rank_0():
                 logs = {
                     "eval/%s" % k: v
