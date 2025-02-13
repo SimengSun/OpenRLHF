@@ -156,7 +156,6 @@ def train(args):
         max_time_per_run=args.max_time_per_run,
     )
 
-
     trainer.fit(args, consumed_samples, num_update_steps_per_epoch)
 
     # save model checkpoint after fitting on only rank0
