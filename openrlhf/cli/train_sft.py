@@ -168,7 +168,7 @@ def train(args):
     args.eval_steps = global_step if args.eval_steps > 0 else args.eval_steps
     args.save_steps = global_step if args.save_steps > 0 else args.save_steps
 
-    self.save_logs_and_checkpoints(args, global_step, None, {}, client_states)
+    trainer.save_logs_and_checkpoints(args, global_step, None, {}, client_states)
 
     # save model checkpoint after fitting on only rank0
     strategy.save_model(model, tokenizer, args.save_path)
