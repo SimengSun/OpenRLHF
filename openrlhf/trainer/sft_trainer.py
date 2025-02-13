@@ -221,6 +221,17 @@ class SFTTrainer(ABC):
 
             epoch_bar.update()
 
+        # Save deepspeed checkpoint
+        global_step = max_steps
+        client_states = {"consumed_samples": global_step * args.train_batch_size}
+        # We will force logging, evaluation and checkpointing to occur immediately
+        # by forcing the value of these step counter equal to global_step
+        args.logging_steps = global_step if args.logging_steps > 0 else args.logging_steps
+        args.eval_steps = global_step if args.eval_steps > 0 else args.eval_steps
+        args.save_steps = global_step if args.save_steps > 0 else args.save_steps
+
+        self.save_logs_and_checkpoints(args, global_step, step_bar, {}, client_states)
+
         if self._wandb is not None and self.strategy.is_rank_0():
             self._wandb.finish()
         if self._tensorboard is not None and self.strategy.is_rank_0():
