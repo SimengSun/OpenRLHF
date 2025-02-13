@@ -156,7 +156,19 @@ def train(args):
         max_time_per_run=args.max_time_per_run,
     )
 
+
     trainer.fit(args, consumed_samples, num_update_steps_per_epoch)
+
+    # Save deepspeed checkpoint
+    global_step = max_steps
+    client_states = {"consumed_samples": global_step * args.train_batch_size}
+    # We will force logging, evaluation and checkpointing to occur immediately
+    # by forcing the value of these step counter equal to global_step
+    args.logging_steps = global_step if args.logging_steps > 0 else args.logging_steps
+    args.eval_steps = global_step if args.eval_steps > 0 else args.eval_steps
+    args.save_steps = global_step if args.save_steps > 0 else args.save_steps
+
+    self.save_logs_and_checkpoints(args, global_step, None, {}, client_states)
 
     # save model checkpoint after fitting on only rank0
     strategy.save_model(model, tokenizer, args.save_path)
