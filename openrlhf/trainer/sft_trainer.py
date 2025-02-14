@@ -222,11 +222,7 @@ class SFTTrainer(ABC):
             epoch_bar.update()
 
         # Save deepspeed checkpoint
-        # If we have already finished training, then we decrement the step counter that was auto incremented
-        # before the start of epoch
-        if start_epoch == self.epochs:
-            step -= 1
-
+        step -= 1
         global_step = step // self.strategy.accumulated_gradient
         client_states = {"consumed_samples": global_step * args.train_batch_size}
         # We will force logging, evaluation and checkpointing to occur immediately
