@@ -508,9 +508,10 @@ class PPOTrainer(ABC):
                 ):
                     eval_buffer['reward'].extend(experience.info['reward'])
                     pbar.update()
+            rewards = torch.stack(eval_buffer['reward'])
+            rewards = self.strategy.all_gather(rewards)
+            logs_dict['reward'] = rewards.mean().item()
 
-            if len(eval_buffer['reward']) > 0:
-                logs_dict['reward'] = torch.stack(eval_buffer['reward']).mean().item()
             return logs_dict
 
     def save_logs_and_checkpoints(self, args, global_step, step_bar, logs_dict={}, client_states={}):
