@@ -33,11 +33,6 @@ def _validate_args(args):
 
     assert args.zero_stage != 3 or args.vllm_num_engines > 0, f"ZeRO-3 is only supported when vLLM enabled"
 
-    if args.vllm_num_engines > 0:
-        assert (
-            actor_world_size % args.vllm_num_engines == 0
-        ), f"actor_world_size must be divisible by vllm_num_engines, got {actor_world_size} and {args.vllm_num_engines}"
-
     if args.critic_pretrain:
         critic_world_size = args.critic_num_nodes * args.critic_num_gpus_per_node
         assert (
