@@ -501,10 +501,14 @@ class PPOTrainer(ABC):
                 disable=not self.strategy.is_rank_0(),
             )
 
+            eval_generate_kwargs = self.generate_kwargs.copy()
+            # Set greedy sampling for eval
+            eval_generate_kwargs['temperature'] = 0
+
             logs_dict = {}
             for prompts, input_dict in dataloader:
                 for i, experience in enumerate(
-                    self.experience_maker.make_experience_list(extra_rm_args, (prompts, input_dict), **self.generate_kwargs)
+                    self.experience_maker.make_experience_list(extra_rm_args, (prompts, input_dict), **eval_generate_kwargs)
                 ):
                     eval_buffer['reward'].extend(experience.info['reward'])
                     pbar.update()
