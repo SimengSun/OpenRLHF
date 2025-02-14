@@ -2,6 +2,7 @@ import itertools
 import math
 import os
 import socket
+import subprocess
 from typing import Callable, Dict, List
 
 import deepspeed
@@ -20,6 +21,13 @@ from openrlhf.utils.distributed_util import init_process_group
 from openrlhf.utils.max_time_manager import MaxTimeManager
 
 from .launcher import BasePPORole
+
+def global_ray_shutdown():
+    try:
+        subprocess.run(["ray", "stop"], check=True)
+        print("Ray processes have been stopped successfully.")
+    except subprocess.CalledProcessError:
+        print("An error occurred while trying to stop Ray processes.")
 
 
 class ActorPPOTrainer(PPOTrainer):
@@ -138,7 +146,7 @@ class ActorPPOTrainer(PPOTrainer):
             # Call super() to save the logs and checkpoints
             super().save_logs_and_checkpoints(args, global_step, step_bar, logs_dict, client_states)
             # Exit the program early
-            raise Exception(f"Max time has been reached. Signalling to save a checkpoint.")
+            global_ray_shutdown()
         else:
             return super().save_logs_and_checkpoints(args, global_step, step_bar, logs_dict, client_states)
 
