@@ -364,8 +364,7 @@ class ActorModelRayActor(BasePPORole):
             )
 
             if args.limit_val_batches is not None:
-                samples_per_batch = args.rollout_batch_size // strategy.world_size
-                samples_in_limited_batches = args.limit_val_batches * samples_per_batch
+                samples_in_limited_batches = args.limit_val_batches * args.rollout_batch_size
                 eval_data = eval_data.select(range(min(samples_in_limited_batches, len(eval_data))))
 
             self.eval_dataset = PromptDataset(

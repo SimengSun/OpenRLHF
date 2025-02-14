@@ -219,6 +219,7 @@ class PPOTrainer(ABC):
         # Restore step and start_epoch
         steps = consumed_samples // args.rollout_batch_size + 1
         start_episode = consumed_samples // args.rollout_batch_size // num_rollouts_per_episodes
+        global_consumed_samples = consumed_samples
         consumed_samples = consumed_samples % (num_rollouts_per_episodes * args.rollout_batch_size)
 
         for episode in range(start_episode, args.num_episodes):
@@ -254,11 +255,26 @@ class PPOTrainer(ABC):
                 pbar.set_postfix(status)
 
                 # logs/checkpoints
-                client_states = {"consumed_samples": steps * args.rollout_batch_size}
+                client_states = {"consumed_samples": (global_consumed_samples := steps * args.rollout_batch_size * args.n_samples_per_prompt)}
+                status["consumed_samples"] = global_consumed_samples
                 self.save_logs_and_checkpoints(args, steps, pbar, status, client_states)
 
                 pbar.update()
                 steps = steps + 1
+
+        # Save deepspeed checkpoint
+        # We will only get here if training has finished (eiter in the current job, or a previous one)
+        # We decrement the step counter that was auto incremented
+        steps -= 1
+        global_step = steps
+        client_states = {"consumed_samples": global_consumed_samples}
+        # We will force logging, evaluation and checkpointing to occur immediately
+        # by forcing the value of these step counter equal to global_step
+        args.logging_steps = global_step if args.logging_steps > 0 else args.logging_steps
+        args.eval_steps = global_step if args.eval_steps > 0 else args.eval_steps
+        args.save_steps = global_step if args.save_steps > 0 else args.save_steps
+
+        self.save_logs_and_checkpoints(args, global_step, None, {}, client_states)
 
         if self._wandb is not None and self.strategy.is_rank_0():
             self._wandb.finish()
