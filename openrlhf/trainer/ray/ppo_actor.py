@@ -487,6 +487,7 @@ class ActorModelRayActor(BasePPORole):
             save_hf_ckpt=args.save_hf_ckpt,
             disable_ds_ckpt=args.disable_ds_ckpt,
             max_time_per_run=args.max_time_per_run,
+            buffer_limit=args.buffer_limit,
         )
 
         # broadcast checkpoint
