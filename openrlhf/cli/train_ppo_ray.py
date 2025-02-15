@@ -374,6 +374,7 @@ if __name__ == "__main__":
     # performance tuning
     parser.add_argument("--perf", action="store_true", default=False)
 
+    parser.add_argument('--no_truncate_prompts', dest='truncate_prompts', action='store_false', default=True)
     parser.add_argument("--extra_rm_args", type=str, default="{}")
 
     args = parser.parse_args()
