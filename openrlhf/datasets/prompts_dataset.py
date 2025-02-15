@@ -59,6 +59,8 @@ class PromptDataset(Dataset):
             self.prompt_metadata.append(data)
             self.prompts.append(prompt)
 
+        print(f'# prompts <= length {max_prompt_length} read are {len(self.prompts)}')
+
     def __len__(self):
         length = len(self.prompts)
         return length

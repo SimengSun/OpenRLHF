@@ -355,7 +355,7 @@ class ActorModelRayActor(BasePPORole):
             self.tokenizer, 
             strategy, 
             input_template=args.input_template, 
-            max_prompt_length=args.prompt_max_len if not args.truncate_prompts else None,
+            max_prompt_length=args.prompt_max_len if not args.truncated_prompts else None,
         )
 
         def custom_collate_fn(batch):
