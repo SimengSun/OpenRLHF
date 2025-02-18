@@ -351,7 +351,11 @@ class ActorModelRayActor(BasePPORole):
         )
         prompts_data = prompts_data.select(range(min(args.max_samples, len(prompts_data))))
         self.prompts_dataset = PromptDataset(
-            prompts_data, self.tokenizer, strategy, input_template=args.input_template
+            prompts_data, 
+            self.tokenizer, 
+            strategy, 
+            input_template=args.input_template, 
+            max_prompt_length=args.prompt_max_len if not args.truncated_prompts else None,
         )
 
         def custom_collate_fn(batch):
@@ -483,6 +487,7 @@ class ActorModelRayActor(BasePPORole):
             save_hf_ckpt=args.save_hf_ckpt,
             disable_ds_ckpt=args.disable_ds_ckpt,
             max_time_per_run=args.max_time_per_run,
+            buffer_limit=args.buffer_limit,
         )
 
         # broadcast checkpoint

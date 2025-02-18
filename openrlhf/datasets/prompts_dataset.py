@@ -32,6 +32,7 @@ class PromptDataset(Dataset):
         tokenizer,
         strategy,
         input_template=None,
+        max_prompt_length=None,
     ) -> None:
         super().__init__()
         self.strategy = strategy
@@ -49,10 +50,16 @@ class PromptDataset(Dataset):
         self.prompt_metadata = []
         for i, data in tqdm(enumerate(dataset), desc="Preprocessing data", disable=not self.strategy.is_rank_0()):
             prompt = preprocess_data(data, input_template, input_key, apply_chat_template)
+            if max_prompt_length is not None:
+                toks = tokenizer(prompt, add_special_tokens=False)['input_ids']
+                if len(toks) > max_prompt_length:
+                    continue
             data.pop(input_key)
             data['_idx'] = i
             self.prompt_metadata.append(data)
             self.prompts.append(prompt)
+
+        print(f'# prompts <= length {max_prompt_length} read are {len(self.prompts)}')
 
     def __len__(self):
         length = len(self.prompts)
