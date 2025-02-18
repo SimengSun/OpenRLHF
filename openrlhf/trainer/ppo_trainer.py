@@ -219,7 +219,6 @@ class PPOTrainer(ABC):
         # Restore step and start_epoch
         steps = consumed_samples // args.rollout_batch_size + 1
         start_episode = consumed_samples // args.rollout_batch_size // num_rollouts_per_episodes
-        global_consumed_samples = consumed_samples
         consumed_samples = consumed_samples % (num_rollouts_per_episodes * args.rollout_batch_size)
 
         for episode in range(start_episode, args.num_episodes):
@@ -255,8 +254,11 @@ class PPOTrainer(ABC):
                 pbar.set_postfix(status)
 
                 # logs/checkpoints
-                client_states = {"consumed_samples": (global_consumed_samples := steps * args.rollout_batch_size * args.n_samples_per_prompt)}
-                status["consumed_samples"] = global_consumed_samples
+                client_states = {
+                    "consumed_samples": steps * args.rollout_batch_size,
+                    "generated_samples": (generated_samples := steps * args.rollout_batch_size * args.n_samples_per_prompt),
+                }
+                status.update(client_states)
                 self.save_logs_and_checkpoints(args, steps, pbar, status, client_states)
 
                 pbar.update()
@@ -267,7 +269,10 @@ class PPOTrainer(ABC):
         # We decrement the step counter that was auto incremented
         steps -= 1
         global_step = steps
-        client_states = {"consumed_samples": global_consumed_samples}
+        client_states = {
+            "consumed_samples": steps * args.rollout_batch_size,
+            "generated_samples": steps * args.rollout_batch_size * args.n_samples_per_prompt,
+        }
         # We will force logging, evaluation and checkpointing to occur immediately
         # by forcing the value of these step counter equal to global_step
         args.logging_steps = global_step if args.logging_steps > 0 else args.logging_steps
