@@ -347,6 +347,13 @@ class NaiveExperienceMaker(ABC):
             "total_length": samples.total_length,
             "num_actions": num_actions,
         }
+
+        if type(r) == dict:
+            assert 'reward' in r
+            info.update(r)
+        else:
+            info['reward'] = r
+
         # reset model state
         self.actor.train()
         if self.critic is not None:
