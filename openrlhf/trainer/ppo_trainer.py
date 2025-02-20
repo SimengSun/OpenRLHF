@@ -435,6 +435,7 @@ class PPOTrainer(ABC):
         status = {"policy_loss": actor_loss.item(), "actor_lr": self.actor_scheduler.get_last_lr()[0]}
         if self.pretrain_dataloader is not None:
             status["ptx_loss"] = ptx_loss.item()
+        print('YYY', experience.info.keys())
         for k, v in experience.info.items():
             if k == "kl":
                 status[k] = (
@@ -516,12 +517,11 @@ class PPOTrainer(ABC):
                 self.experience_maker.make_experience_list(extra_rm_args, (prompts, input_dict), **eval_generate_kwargs)
             ):
                 for k, v in experience.info.items():
-                    if k.startswith('reward'):
+                    if k.startswith('reward') or k.startswith('metric'):
                         eval_buffer[k].extend(v)
                 pbar.update()
 
         for k, v in eval_buffer.items():
-            assert k.startswith('reward')
             metrics = torch.stack(eval_buffer[k])
             metrics = self.strategy.all_gather(metrics)
             logs_dict[k] = metrics.mean().item()
