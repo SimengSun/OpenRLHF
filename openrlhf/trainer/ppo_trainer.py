@@ -345,6 +345,8 @@ class PPOTrainer(ABC):
             status_mean = status_list[0]
             for m in status_list[1:]:
                 for k, v in m.items():
+                    if k not in status_mean:
+                        status_mean[k] = 0
                     status_mean[k] += v
             for k in status_mean.keys():
                 status_mean[k] /= len(status_list)
