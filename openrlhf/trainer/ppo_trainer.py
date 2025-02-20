@@ -523,9 +523,10 @@ class PPOTrainer(ABC):
                 pbar.update()
 
         for k, v in eval_buffer.items():
-            metrics = torch.stack(eval_buffer[k])
-            metrics = self.strategy.all_gather(metrics)
-            logs_dict[k] = metrics.mean().item()
+            if len(eval_buffer[k]) > 0:
+                metrics = torch.stack(eval_buffer[k])
+                metrics = self.strategy.all_gather(metrics)
+                logs_dict[k] = metrics.mean().item()
 
         return logs_dict
 
