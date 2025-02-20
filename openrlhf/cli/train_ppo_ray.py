@@ -331,7 +331,7 @@ if __name__ == "__main__":
         "--prompt_data_probs",
         type=str,
         default="1.0",
-        help="sampling probs for datasets",
+        help="sampling probs for datasets; comma separated list",
     )
     parser.add_argument("--prompt_split", type=str, default="train")
     parser.add_argument("--eval_data", type=str, default=None, help="HF dataset name or path")
@@ -339,7 +339,7 @@ if __name__ == "__main__":
         "--eval_data_probs",
         type=str,
         default="1.0",
-        help="sampling probs for datasets",
+        help="sampling probs for datasets; comma separated list",
     )
     parser.add_argument("--pretrain_data", type=str, default=None, help="HF dataset name or path")
     parser.add_argument(
@@ -385,6 +385,7 @@ if __name__ == "__main__":
 
     print('Extra RM Args:')
     pprint(args.extra_rm_args)
+    print('eval_steps', args.eval_steps)
 
     if args.advantage_estimator not in ["gae"]:
         args.critic_pretrain = None
