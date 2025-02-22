@@ -313,9 +313,17 @@ class PPOTrainer(ABC):
                 # for DP
                 # weighted mean for kl
                 if "kl" in status:
-                    status["kl"] *= status["response_length"]
-                    status = self.strategy.all_reduce(status)
-                    status["kl"] /= status["response_length"]
+                    nonmetric_status = {k : v for k, v in status.items() if not k.startswith('metric_')}
+                    metric_status = {k : v for k, v in status.items() if k.startswith('metric_')}
+                    nonmetric_status["kl"] *= nonmetric_status["response_length"]
+                    nonmetric_status = self.strategy.all_reduce(nonmetric_status)
+                    nonmetric_status["kl"] /= nonmetric_status["response_length"]
+
+                    metric_status = self.strategy.all_gather(metric_status)
+                    for k, v in metric_status.items():
+                        metric_status[k] = [v]
+                    status = nonmetric_status
+                    status.update(metric_status)
 
                 short_status = {}
 
@@ -346,10 +354,20 @@ class PPOTrainer(ABC):
             for m in status_list[1:]:
                 for k, v in m.items():
                     if k not in status_mean:
-                        status_mean[k] = 0
+                        if k.startswith('metric_'):
+                            status_mean[k] = []
+                        else:
+                            status_mean[k] = 0
+                    assert not k.startswith('metric_') or type(status_mean[k]) == list, f'{k}; {type(status_mean[k])}'
                     status_mean[k] += v
             for k in status_mean.keys():
-                status_mean[k] /= len(status_list)
+                if type(status_mean[k]) == list:
+                    status_mean[k] = torch.cat(status_mean[k]).mean().item()
+                else:
+                    status_mean[k] /= len(status_list)
+        for k, v in status_mean.items():
+            if k.startswith('metric_'):
+                assert type(status_mean[k]) == float, f'{k}; {type(status_mean[k])}; {status_mean[k]}'
         return status_mean
 
     def training_step(self, experience: Experience, global_steps) -> Dict[str, float]:
@@ -442,6 +460,9 @@ class PPOTrainer(ABC):
                 status[k] = (
                     (v * experience.info["response_length"]).sum() / experience.info["response_length"].sum()
                 ).item()
+            elif k.startswith('metric_'):
+                print('YYY1', k, type(v))
+                status[k] = v
             else:
                 status[k] = v.mean().item()
         return status
@@ -517,15 +538,22 @@ class PPOTrainer(ABC):
             for i, experience in enumerate(
                 self.experience_maker.make_experience_list(extra_rm_args, (prompts, input_dict), **eval_generate_kwargs)
             ):
-                for k, v in experience.info.items():
-                    if k.startswith('reward') or k.startswith('metric'):
-                        eval_buffer[k].extend(v)
+                batch_size = len(experience.sequences)
+                status = {k : v for k, v in experience.info.items() if (k == 'reward') or k.startswith('metric_')}
+                #for k, v in experience.info.items():
+                #    if k.startswith('reward'):
+                #        v = torch.unbind(v)
+                #        assert batch_size == len(v)
+                #    eval_buffer[k].extend(v)
+                status = self.strategy.all_gather(status)
+                for k, v in status.items():
+                    if v.shape[0] > 0:
+                        eval_buffer[k].extend([v])
                 pbar.update()
 
         for k, v in eval_buffer.items():
             if len(eval_buffer[k]) > 0:
-                metrics = torch.stack(eval_buffer[k])
-                metrics = self.strategy.all_gather(metrics)
+                metrics = torch.cat(eval_buffer[k])
                 logs_dict[k] = metrics.mean().item()
 
         return logs_dict
@@ -560,7 +588,9 @@ class PPOTrainer(ABC):
 
         # Run eval after check for checkpoint  save in case checkpoint save comes at the end of the job
         if global_step % args.eval_steps == 0 and self.eval_dataloader is not None:
+            print('XXX1')
             logs_dict = self.evaluate(self.eval_dataloader, global_step, args.extra_rm_args)
+            print('XXX2')
             if self._wandb is not None and self.strategy.is_rank_0():
                 logs = {
                     "eval/%s" % k: v
@@ -569,6 +599,7 @@ class PPOTrainer(ABC):
                         "global_step": global_step,
                     }.items()
                 }
+                print('WWWEEE', logs)
                 self._wandb.log(logs)
 
     def _save_checkpoint(self, args, tag, client_states):

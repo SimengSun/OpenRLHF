@@ -626,7 +626,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         reward_metrics = {}
         if (len(rewards) > 0) and (type(rewards[0]) == dict):
             for k, v in rewards[0].items():
-                if k == 'reward':
+                if not k.startswith('metric_'):
                     continue
                 reward_metrics[k] = [r[k] for r in rewards]
                 reward_metrics[k] = self.reward_fn(reward_metrics[k])
