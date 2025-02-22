@@ -184,7 +184,7 @@ class NaiveExperienceMaker(ABC):
         return {k: v.to(device) for k, v in batch.items()}
 
     @torch.no_grad()
-    def make_experience_list(self, extra_rm_args, all_prompts: Union[Dict, List[Dict]], **generate_kwargs) -> List[Experience]:
+    def make_experience_list(self, extra_rm_args, all_prompts: Union[Dict, List[Dict]], eval=False, **generate_kwargs) -> List[Experience]:
         """
         Make a list of experience with the micro_rollout_batch_size.
 
@@ -194,7 +194,7 @@ class NaiveExperienceMaker(ABC):
         """
         args = self.strategy.args
         # generate responses
-        samples_list = self.generate_samples(all_prompts, **generate_kwargs)
+        samples_list = self.generate_samples(all_prompts, eval=eval, **generate_kwargs)
         torch.distributed.barrier()
 
         experiences = []
@@ -254,7 +254,7 @@ class NaiveExperienceMaker(ABC):
         return experiences
 
     @torch.no_grad()
-    def generate_samples(self, all_prompts: List[str], **generate_kwargs) -> List[Samples]:
+    def generate_samples(self, all_prompts: List[str], eval=False, **generate_kwargs) -> List[Samples]:
         """
         Generate samples and return in batches.
         """
@@ -264,7 +264,8 @@ class NaiveExperienceMaker(ABC):
         self.actor.eval()
         # sample multiple response
         all_prompts = sum([[prompt] * args.n_samples_per_prompt for prompt in all_prompts], [])
-        all_prompt_metadata = sum([[deepcopy(prompt_metadata) for _ in range(args.n_samples_per_prompt)] for prompt_metadata in all_prompt_metadata], [])
+        n_samples = args.n_samples_per_prompt if not eval else 1
+        all_prompt_metadata = sum([[deepcopy(prompt_metadata) for _ in range(n_samples)] for prompt_metadata in all_prompt_metadata], [])
         samples_list = []
         for i in range(0, len(all_prompts), args.micro_rollout_batch_size):
             prompt_metadata = all_prompt_metadata[i : i + args.micro_rollout_batch_size]
@@ -498,14 +499,14 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
             self.custom_reward_func = ray.remote(self.custom_reward_func)
 
     @torch.no_grad()
-    def make_experience_list(self, extra_rm_args, all_prompts: Union[Dict, List[Dict]], **generate_kwargs) -> List[Experience]:
+    def make_experience_list(self, extra_rm_args, all_prompts: Union[Dict, List[Dict]], eval=False, **generate_kwargs) -> List[Experience]:
         if self.strategy.args.perf:
             self.perf_stats = {
                 "generate_time": 0,
                 "actor_value_rm_time": 0,
                 "wait_time": 0,
             }
-        experiences = super().make_experience_list(extra_rm_args, all_prompts, **generate_kwargs)
+        experiences = super().make_experience_list(extra_rm_args, all_prompts, eval=eval, **generate_kwargs)
         if self.critic is not None:
             for experience in experiences:
                 # send experience to critic
@@ -515,7 +516,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         return experiences
 
     @torch.no_grad()
-    def generate_samples(self, all_prompts: List[Dict], **generate_kwargs) -> List[Samples]:
+    def generate_samples(self, all_prompts: List[Dict], eval=False, **generate_kwargs) -> List[Samples]:
         """
         Generate samples and return in batches.
 
@@ -523,9 +524,9 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         in which actor will be used to generate samples.
         """
         if self.vllm_engines is None:
-            return super().generate_samples(all_prompts, **generate_kwargs)
+            return super().generate_samples(all_prompts, eval=eval, **generate_kwargs)
 
-        return self._generate_vllm(all_prompts, **generate_kwargs)
+        return self._generate_vllm(all_prompts, eval=eval, **generate_kwargs)
 
     @torch.no_grad()
     def make_experience(self, extra_rm_args, samples: Samples) -> Experience:
@@ -677,7 +678,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         self.actor.train()  # reset model state
         return experience
 
-    def _generate_vllm(self, all_prompts: List[Dict], **kwargs) -> List[Samples]:
+    def _generate_vllm(self, all_prompts: List[Dict], eval=False, **kwargs) -> List[Samples]:
         from vllm import SamplingParams
 
         all_prompts, all_prompt_metadata = all_prompts
@@ -704,8 +705,9 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         )
 
         # Expand prompt list based on the number of samples per prompt
-        all_prompts = sum([[prompt] * args.n_samples_per_prompt for prompt in all_prompts], [])
-        all_prompt_metadata = sum([[deepcopy(prompt_metadata) for _ in range(args.n_samples_per_prompt)] for prompt_metadata in all_prompt_metadata], [])
+        n_samples_per_prompt = args.n_samples_per_prompt if not eval else 1
+        all_prompts = sum([[prompt] * n_samples_per_prompt for prompt in all_prompts], [])
+        all_prompt_metadata = sum([[deepcopy(prompt_metadata) for _ in range(n_samples_per_prompt)] for prompt_metadata in all_prompt_metadata], [])
         all_prompt_token_ids = self.tokenize_fn(all_prompts, self.prompt_max_len, padding=False)["input_ids"]
 
         # Distribute requests to engines and collect responses to outputs

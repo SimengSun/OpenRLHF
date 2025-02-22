@@ -514,7 +514,7 @@ class PPOTrainer(ABC):
             logs_dict = {}
             for prompts, input_dict in dataloader:
                 for i, experience in enumerate(
-                    self.experience_maker.make_experience_list(extra_rm_args, (prompts, input_dict), **eval_generate_kwargs)
+                    self.experience_maker.make_experience_list(extra_rm_args, (prompts, input_dict), eval=True, **eval_generate_kwargs)
                 ):
                     eval_buffer['reward'].extend(experience.info['reward'])
                     # eval_buffer['samples'].extend(experience.sequences)
