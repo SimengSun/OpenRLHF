@@ -2,6 +2,7 @@ import os
 import os.path
 from abc import ABC
 from collections import defaultdict
+import subprocess
 from typing import Any, Callable, Dict, List, Optional
 
 import torch
@@ -516,10 +517,53 @@ class PPOTrainer(ABC):
                     self.experience_maker.make_experience_list(extra_rm_args, (prompts, input_dict), **eval_generate_kwargs)
                 ):
                     eval_buffer['reward'].extend(experience.info['reward'])
+                    # eval_buffer['samples'].extend(experience.sequences)
+                    eval_buffer['response_length'].extend(experience.info['response_length'])
+                    eval_buffer['samples'].extend(experience.sequences)
+                    # self.strategy.print(output)
                     pbar.update()
-            rewards = torch.stack(eval_buffer['reward'])
-            rewards = self.strategy.all_gather(rewards)
+
+            if self.strategy.is_rank_0():
+                import tempfile
+                import json
+                seq_buffer = []
+                columns = ["text", "text_length", "reward", "global_step"]
+                for i, sample in enumerate(eval_buffer['samples']):
+                    output = self.tokenizer.batch_decode(
+                        sample, skip_special_tokens=True
+                    )
+                    text = output
+                    reward = eval_buffer['reward'][i].item()
+                    output_text = ''.join(text)
+                    seq_buffer.append([output_text, len(text), reward, global_step])
+
+                with tempfile.TemporaryDirectory() as tmpdirname:
+                    os.makedirs(os.path.join(tmpdirname, 'eval-samples'), exist_ok=True)
+                    samples_file = os.path.join(tmpdirname, 'eval-samples', f'eval-samples-{global_step}.json')
+                    with open(samples_file, 'w') as f:
+                        json_seq_buffer = {i: {columns[j]: entry[j] for j in range(len(columns))} for i, entry in enumerate(seq_buffer)}
+                        for entry in json_seq_buffer.values():
+                            text = entry["text"]
+                            reformatted_text = text.split('\n')
+                            entry["text"] = reformatted_text
+                        f.write(json.dumps(json_seq_buffer, indent=4))
+                    self._wandb.save(samples_file, base_path=tmpdirname, policy='now')
+                    subprocess.run(['wandb', 'sync'])
+                table = self._wandb.Table(columns=columns, data=seq_buffer)
+                self._wandb.log({"eval/samples_table": table})
+
+
+            for k in ['reward', 'response_length']:
+                eval_buffer[k] = torch.stack(eval_buffer[k])
+
+            # rewards = torch.stack(eval_buffer['reward'])
+            # rewards = self.strategy.all_gather(rewards)
+            # eval_results = self.strategy.all_gather(eval_buffer)
+            # import torch.distributed as dist
+            # samples = dist.all_gather_object(eval_buffer['samples'])
+            rewards = self.strategy.all_gather(eval_buffer['reward'])
             logs_dict['reward'] = rewards.mean().item()
+            # self.strategy.print(f"Eval samples {len(samples)}: {samples}")
 
             return logs_dict
 
