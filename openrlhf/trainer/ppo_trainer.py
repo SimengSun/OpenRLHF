@@ -588,9 +588,7 @@ class PPOTrainer(ABC):
 
         # Run eval after check for checkpoint  save in case checkpoint save comes at the end of the job
         if global_step % args.eval_steps == 0 and self.eval_dataloader is not None:
-            print('XXX1')
             logs_dict = self.evaluate(self.eval_dataloader, global_step, args.extra_rm_args)
-            print('XXX2')
             if self._wandb is not None and self.strategy.is_rank_0():
                 logs = {
                     "eval/%s" % k: v
@@ -599,7 +597,6 @@ class PPOTrainer(ABC):
                         "global_step": global_step,
                     }.items()
                 }
-                print('WWWEEE', logs)
                 self._wandb.log(logs)
 
     def _save_checkpoint(self, args, tag, client_states):
