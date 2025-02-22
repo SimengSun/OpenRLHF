@@ -1,5 +1,6 @@
 import os
 import os.path
+import time
 from abc import ABC
 from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional
@@ -360,6 +361,7 @@ class PPOTrainer(ABC):
 
     def training_step_actor(self, experience: Experience) -> Dict[str, float]:
         self.actor.train()
+        start_time = time.time()
 
         # TODO: this is a bad indicator to say that data is packed...
         if isinstance(experience.sequences, list):
@@ -442,10 +444,13 @@ class PPOTrainer(ABC):
                 ).item()
             else:
                 status[k] = v.mean().item()
+
+        status['time_actor_step'] = time.time() - start_time
         return status
 
     def training_step_critic(self, experience: Experience) -> Dict[str, float]:
         self.critic.train()
+        start_time = time.time()
 
         # TODO: this is a bad indicator to say that data is packed...
         if isinstance(experience.sequences, list):
@@ -494,11 +499,13 @@ class PPOTrainer(ABC):
             "critic_loss": critic_loss.item(),
             "values": masked_mean(values, experience.action_mask).item(),
             "critic_lr": self.critic_scheduler.get_last_lr()[0],
+            "time_critic_step": time.time() - start_time,
         }
         return status
 
     def evaluate(self, dataloader, global_step, extra_rm_args):
             eval_buffer = defaultdict(list)
+            start_time = time.time()
 
             pbar = tqdm(
                 range(dataloader.__len__()),
@@ -520,6 +527,7 @@ class PPOTrainer(ABC):
             rewards = torch.stack(eval_buffer['reward'])
             rewards = self.strategy.all_gather(rewards)
             logs_dict['reward'] = rewards.mean().item()
+            logs_dict['time_eval'] = time.time() - start_time
 
             return logs_dict
 
