@@ -539,7 +539,7 @@ class PPOTrainer(ABC):
 
                 with tempfile.TemporaryDirectory() as tmpdirname:
                     os.makedirs(os.path.join(tmpdirname, 'eval-samples'), exist_ok=True)
-                    samples_file = os.path.join(tmpdirname, 'eval-samples', f'eval-samples-{global_step}.json')
+                    samples_file = os.path.join(tmpdirname, 'eval-samples', f'eval-samples-{global_step:04d}.json')
                     with open(samples_file, 'w') as f:
                         json_seq_buffer = {i: {columns[j]: entry[j] for j in range(len(columns))} for i, entry in enumerate(seq_buffer)}
                         for entry in json_seq_buffer.values():
