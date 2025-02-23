@@ -461,7 +461,6 @@ class PPOTrainer(ABC):
                     (v * experience.info["response_length"]).sum() / experience.info["response_length"].sum()
                 ).item()
             elif k.startswith('metric_'):
-                print('YYY1', k, type(v))
                 status[k] = v
             else:
                 status[k] = v.mean().item()
@@ -550,6 +549,7 @@ class PPOTrainer(ABC):
                 metrics = torch.cat(eval_buffer[k])
                 logs_dict[k] = metrics.mean().item()
 
+        print('Evaluation:', logs_dict)
         return logs_dict
 
     def save_logs_and_checkpoints(self, args, global_step, step_bar, logs_dict={}, client_states={}):
