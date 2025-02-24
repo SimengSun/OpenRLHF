@@ -313,9 +313,17 @@ class PPOTrainer(ABC):
                 # for DP
                 # weighted mean for kl
                 if "kl" in status:
-                    status["kl"] *= status["response_length"]
-                    status = self.strategy.all_reduce(status)
-                    status["kl"] /= status["response_length"]
+                    nonmetric_status = {k : v for k, v in status.items() if not k.startswith('metric_')}
+                    metric_status = {k : v for k, v in status.items() if k.startswith('metric_')}
+                    nonmetric_status["kl"] *= nonmetric_status["response_length"]
+                    nonmetric_status = self.strategy.all_reduce(nonmetric_status)
+                    nonmetric_status["kl"] /= nonmetric_status["response_length"]
+
+                    metric_status = self.strategy.all_gather(metric_status)
+                    for k, v in metric_status.items():
+                        metric_status[k] = [v]
+                    status = nonmetric_status
+                    status.update(metric_status)
 
                 short_status = {}
 
@@ -345,9 +353,21 @@ class PPOTrainer(ABC):
             status_mean = status_list[0]
             for m in status_list[1:]:
                 for k, v in m.items():
+                    if k not in status_mean:
+                        if k.startswith('metric_'):
+                            status_mean[k] = []
+                        else:
+                            status_mean[k] = 0
+                    assert not k.startswith('metric_') or type(status_mean[k]) == list, f'{k}; {type(status_mean[k])}'
                     status_mean[k] += v
             for k in status_mean.keys():
-                status_mean[k] /= len(status_list)
+                if type(status_mean[k]) == list:
+                    status_mean[k] = torch.cat(status_mean[k]).mean().item()
+                else:
+                    status_mean[k] /= len(status_list)
+        for k, v in status_mean.items():
+            if k.startswith('metric_'):
+                assert type(status_mean[k]) == float, f'{k}; {type(status_mean[k])}; {status_mean[k]}'
         return status_mean
 
     def training_step(self, experience: Experience, global_steps) -> Dict[str, float]:
@@ -440,6 +460,8 @@ class PPOTrainer(ABC):
                 status[k] = (
                     (v * experience.info["response_length"]).sum() / experience.info["response_length"].sum()
                 ).item()
+            elif k.startswith('metric_'):
+                status[k] = v
             else:
                 status[k] = v.mean().item()
         return status
@@ -498,30 +520,37 @@ class PPOTrainer(ABC):
         return status
 
     def evaluate(self, dataloader, global_step, extra_rm_args):
-            eval_buffer = defaultdict(list)
+        eval_buffer = defaultdict(list)
 
-            pbar = tqdm(
-                range(dataloader.__len__()),
-                desc=f"Eval global step [{global_step}]",
-                disable=not self.strategy.is_rank_0(),
-            )
+        pbar = tqdm(
+            range(dataloader.__len__()),
+            desc=f"Eval global step [{global_step}]",
+            disable=not self.strategy.is_rank_0(),
+        )
 
-            eval_generate_kwargs = self.generate_kwargs.copy()
-            # Set greedy sampling for eval
-            eval_generate_kwargs['temperature'] = 0
+        eval_generate_kwargs = self.generate_kwargs.copy()
+        # Set greedy sampling for eval
+        eval_generate_kwargs['temperature'] = self.generate_kwargs['eval_temperature']
 
-            logs_dict = {}
-            for prompts, input_dict in dataloader:
-                for i, experience in enumerate(
-                    self.experience_maker.make_experience_list(extra_rm_args, (prompts, input_dict), **eval_generate_kwargs)
-                ):
-                    eval_buffer['reward'].extend(experience.info['reward'])
-                    pbar.update()
-            rewards = torch.stack(eval_buffer['reward'])
-            rewards = self.strategy.all_gather(rewards)
-            logs_dict['reward'] = rewards.mean().item()
+        logs_dict = {}
+        for prompts, input_dict in dataloader:
+            for i, experience in enumerate(
+                self.experience_maker.make_experience_list(extra_rm_args, (prompts, input_dict), **eval_generate_kwargs)
+            ):
+                status = {k : v for k, v in experience.info.items() if (k == 'reward') or k.startswith('metric_')}
+                status = self.strategy.all_gather(status)
+                for k, v in status.items():
+                    if v.shape[0] > 0:
+                        eval_buffer[k].extend([v])
+                pbar.update()
 
-            return logs_dict
+        for k, v in eval_buffer.items():
+            if len(eval_buffer[k]) > 0:
+                metrics = torch.cat(eval_buffer[k])
+                logs_dict[k] = metrics.mean().item()
+
+        self.strategy.print('Evaluation:', logs_dict)
+        return logs_dict
 
     def save_logs_and_checkpoints(self, args, global_step, step_bar, logs_dict={}, client_states={}):
         if global_step % args.logging_steps == 0:
