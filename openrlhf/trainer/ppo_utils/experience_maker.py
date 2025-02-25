@@ -205,7 +205,7 @@ class NaiveExperienceMaker(ABC):
         ):
             experiences.append(self.make_experience(extra_rm_args, samples).to_device("cpu"))
 
-        experiences, rewards = self.process_experiences(experiences)
+        experiences, rewards = self.process_experiences(experiences, eval_=eval)
 
         # calculate return and advantages
         for experience, reward in zip(experiences, rewards):
@@ -366,7 +366,7 @@ class NaiveExperienceMaker(ABC):
         )
 
     @torch.no_grad()
-    def process_experiences(self, experiences: List[Experience]) -> Tuple[List[Experience], List[torch.Tensor]]:
+    def process_experiences(self, experiences: List[Experience], eval_=False) -> Tuple[List[Experience], List[torch.Tensor]]:
         """
         Process experiences, this can be used to filter out some experiences or do some processing on the rewards.
 
@@ -376,7 +376,7 @@ class NaiveExperienceMaker(ABC):
         """
         args = self.strategy.args
         # reward shaping for RLOO
-        if args.advantage_estimator == "rloo":
+        if args.advantage_estimator == "rloo" and not eval_:
             rewards = torch.cat([experience.info["reward"] for experience in experiences])
             rewards = rewards.reshape(-1, args.n_samples_per_prompt).to(device="cuda")
             baseline = (rewards.sum(-1, keepdim=True) - rewards) / (args.n_samples_per_prompt - 1)
