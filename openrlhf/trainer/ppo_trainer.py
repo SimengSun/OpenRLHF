@@ -364,7 +364,7 @@ class PPOTrainer(ABC):
             for k in status_mean.keys():
                 if type(status_mean[k]) == list:
                     s = torch.cat(status_mean[k])
-                    # -99999 values are masked and ignored
+                    # -99999 values (sentinel values) for the keys with "metrics_" prefix (not the rewards) are masked
                     mask = s != -99999
                     s = s[mask]
                     status_mean[k] = s.mean().item() if s.numel() > 0 else float('nan')
@@ -560,7 +560,7 @@ class PPOTrainer(ABC):
                 metrics = torch.cat(eval_buffer[k])
 
                 if k.startswith('metric_'):
-                    # -99999 values are masked and ignored
+                    # -99999 values (sentinel values) for the keys with "metrics_" prefix (not the rewards) are masked
                     mask = metrics != -99999
                     metrics = metrics[mask]
                     logs_dict[k] = metrics.mean().item() if metrics.numel() > 0 else float('nan')
