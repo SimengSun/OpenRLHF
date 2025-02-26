@@ -387,8 +387,9 @@ class ActorModelRayActor(BasePPORole):
                 max_prompt_length=args.prompt_max_len if not args.truncated_prompts else None,
             )
             strategy.print(f'Number of samples in eval dataset: {len(self.eval_dataset)}')
+            eval_rollout_batch_size = min(args.rollout_batch_size, len(self.eval_dataset))
             self.eval_dataloader = strategy.setup_dataloader(
-                self.eval_dataset, args.rollout_batch_size // strategy.world_size, pin_memory=True, shuffle=False,
+                self.eval_dataset, eval_rollout_batch_size // strategy.world_size, pin_memory=True, shuffle=False,
                 collate_fn=custom_collate_fn,
             )
         else:
