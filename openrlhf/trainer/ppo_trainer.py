@@ -364,6 +364,7 @@ class PPOTrainer(ABC):
             for k in status_mean.keys():
                 if type(status_mean[k]) == list:
                     s = torch.cat(status_mean[k])
+                    # -99999 values are masked and ignored
                     mask = s != -99999
                     s = s[mask]
                     status_mean[k] = s.mean().item() if s.numel() > 0 else float('nan')
@@ -384,7 +385,6 @@ class PPOTrainer(ABC):
 
     def training_step_actor(self, experience: Experience) -> Dict[str, float]:
         start_time = time.time()
-        """
         self.actor.train()
 
         # TODO: this is a bad indicator to say that data is packed...
@@ -459,8 +459,6 @@ class PPOTrainer(ABC):
 
         # status
         status = {"policy_loss": actor_loss.item(), "actor_lr": self.actor_scheduler.get_last_lr()[0]}
-        """
-        status = {"policy_loss": 0, "actor_lr": 0}
         if self.pretrain_dataloader is not None:
             status["ptx_loss"] = ptx_loss.item()
         for k, v in experience.info.items():
@@ -562,6 +560,7 @@ class PPOTrainer(ABC):
                 metrics = torch.cat(eval_buffer[k])
 
                 if k.startswith('metric_'):
+                    # -99999 values are masked and ignored
                     mask = metrics != -99999
                     metrics = metrics[mask]
                     logs_dict[k] = metrics.mean().item() if metrics.numel() > 0 else float('nan')
