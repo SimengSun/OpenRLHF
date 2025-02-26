@@ -363,7 +363,11 @@ class PPOTrainer(ABC):
                     status_mean[k] += v
             for k in status_mean.keys():
                 if type(status_mean[k]) == list:
-                    status_mean[k] = torch.cat(status_mean[k]).mean().item()
+                    s = torch.cat(status_mean[k])
+                    # -99999 values (sentinel values) for the keys with "metrics_" prefix are masked
+                    mask = s != -99999
+                    s = s[mask]
+                    status_mean[k] = s.mean().item() if s.numel() > 0 else float('nan')
                 else:
                     status_mean[k] /= len(status_list)
         for k, v in status_mean.items():
@@ -380,8 +384,8 @@ class PPOTrainer(ABC):
         return status
 
     def training_step_actor(self, experience: Experience) -> Dict[str, float]:
-        self.actor.train()
         start_time = time.time()
+        self.actor.train()
 
         # TODO: this is a bad indicator to say that data is packed...
         if isinstance(experience.sequences, list):
@@ -554,7 +558,14 @@ class PPOTrainer(ABC):
         for k, v in eval_buffer.items():
             if len(eval_buffer[k]) > 0:
                 metrics = torch.cat(eval_buffer[k])
-                logs_dict[k] = metrics.mean().item()
+
+                if k.startswith('metric_'):
+                    # -99999 values (sentinel values) for the keys with "metrics_" prefix (not the rewards) are masked
+                    mask = metrics != -99999
+                    metrics = metrics[mask]
+                    logs_dict[k] = metrics.mean().item() if metrics.numel() > 0 else float('nan')
+                else:
+                    logs_dict[k] = metrics.mean().item()
 
         logs_dict['time_eval'] = time.time() - start_time
 
