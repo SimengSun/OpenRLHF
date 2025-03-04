@@ -304,7 +304,7 @@ class ActorModelRayActor(BasePPORole):
 
         assert args.lr_warmup_steps < max_steps
         actor_scheduler = get_scheduler(
-            args.lr_scheduler
+            args.lr_scheduler,
             actor_optim,
             num_warmup_steps=math.ceil(max_steps * args.lr_warmup_ratio) if args.lr_warmup_steps == 0 else args.lr_warmup_steps,
             num_training_steps=max_steps,
