@@ -72,6 +72,19 @@ def blending_datasets(
                 with open(dataset, "r") as f:
                     data = [json.loads(line) for line in f]
                     keys = {key for item in data for key in item}
+                    key_types = {}
+                    for d in data:
+                        for key in keys:
+                            if key in d:
+                                t = key_types.get(key, None)
+                                t2 = type(d[key])
+                                if (t is None) or (t == t2):
+                                    key_types[key] = t2
+                                else:
+                                    if (t2 == str) or (t2 == float):
+                                        key_types[key] = t2
+                                d[key] = key_types[key](d[key])
+
                 data = {key: [d[key] if key in d else None for d in data] for key in keys}
                 print(data.keys())
                 data = Dataset.from_dict(data)
