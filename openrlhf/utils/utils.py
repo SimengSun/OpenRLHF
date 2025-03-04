@@ -73,6 +73,7 @@ def blending_datasets(
                     data = [json.loads(line) for line in f]
                     keys = {key for item in data for key in item}
                 data = {key: [d[key] if key in d else None for d in data] for key in keys}
+                print(data.keys())
                 data = Dataset.from_dict(data)
             else:
                 data = load_dataset(ext, data_files=dataset)
