@@ -292,6 +292,8 @@ if __name__ == "__main__":
     parser.add_argument("--save_value_network", action="store_true", default=False, help="Save critic model")
     parser.add_argument("--actor_learning_rate", type=float, default=1e-6)
     parser.add_argument("--critic_learning_rate", type=float, default=9e-6)
+    parser.add_argument("--lr_warmup_steps", type=int, default=0)
+    parser.add_argument("--lr_scheduler", type=str, default="cosine_with_min_lr", help="Learning rate scheduler")
     parser.add_argument("--lr_warmup_ratio", type=float, default=0.03)
     parser.add_argument("--kl_target", type=float, default=None)
     parser.add_argument("--init_kl_coef", type=float, default=0.01, help="KL penalty in PPO")

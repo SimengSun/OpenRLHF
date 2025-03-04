@@ -302,10 +302,11 @@ class ActorModelRayActor(BasePPORole):
         max_steps = math.ceil(args.num_episodes * self.num_update_steps_per_episodes)
         self._max_steps = max_steps
 
+        assert args.lr_warmup_steps < max_steps
         actor_scheduler = get_scheduler(
-            "cosine_with_min_lr",
+            args.lr_scheduler
             actor_optim,
-            num_warmup_steps=math.ceil(max_steps * args.lr_warmup_ratio),
+            num_warmup_steps=math.ceil(max_steps * args.lr_warmup_ratio) if args.lr_warmup_steps == 0 else args.lr_warmup_steps,
             num_training_steps=max_steps,
             scheduler_specific_kwargs={"min_lr": args.actor_learning_rate * 0.1},
         )
