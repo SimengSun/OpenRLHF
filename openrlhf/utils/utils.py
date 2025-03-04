@@ -2,6 +2,7 @@ import os
 
 from datasets import interleave_datasets, load_dataset, load_from_disk, Dataset
 from transformers import AutoTokenizer
+from pandas import DataFrame as pd
 
 
 def get_tokenizer(pretrain, model, padding_side="left", strategy=None, use_fast=True):
