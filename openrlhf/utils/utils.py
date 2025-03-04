@@ -68,7 +68,6 @@ def blending_datasets(
         elif ext in [".json", ".jsonl", ".csv"]:
             ext = ext.lower().strip(".")
             if ext == "jsonl":
-                data = pd.read_json(dataset, lines=True)
                 with open(dataset, "r") as f:
                     data = [json.loads(line) for line in f]
                     keys = {key for item in data for key in item}
