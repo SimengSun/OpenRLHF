@@ -83,7 +83,7 @@ def blending_datasets(
                                 else:
                                     if (t2 == str) or (t2 == float):
                                         key_types[key] = t2
-                                if t2 != None:
+                                if key_types[key] != None:
                                     d[key] = key_types[key](d[key])
 
                 data = {key: [d[key] if key in d else None for d in data] for key in keys}
