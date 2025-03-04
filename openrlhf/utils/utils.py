@@ -69,8 +69,28 @@ def blending_datasets(
         elif ext in [".json", ".jsonl", ".csv"]:
             ext = ext.lower().strip(".")
             if ext == "jsonl":
-                ext = "json"
-            data = load_dataset(ext, data_files=dataset)
+                with open(dataset, "r") as f:
+                    data = [json.loads(line) for line in f]
+                    keys = {key for item in data for key in item}
+                    key_types = {}
+                    for d in data:
+                        for key in keys:
+                            if key in d:
+                                t = key_types.get(key, None)
+                                t2 = type(d[key])
+                                if (t is None) or (t == t2):
+                                    key_types[key] = t2
+                                else:
+                                    if (t2 == str) or (t2 == float):
+                                        key_types[key] = t2
+                                if (key_types[key] != None) and (d[key] != None):
+                                    d[key] = key_types[key](d[key])
+
+                data = {key: [d[key] if key in d else None for d in data] for key in keys}
+                print(data.keys())
+                data = Dataset.from_dict(data)
+            else:
+                data = load_dataset(ext, data_files=dataset)
             strategy.print(f"loaded {dataset} with data_files={dataset}")
         # local dataset saved with `datasets.Dataset.save_to_disk`
         elif os.path.isdir(dataset):
