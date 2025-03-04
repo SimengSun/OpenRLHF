@@ -2,7 +2,6 @@ import os
 
 from datasets import interleave_datasets, load_dataset, load_from_disk, Dataset
 from transformers import AutoTokenizer
-import pandas as pd
 
 
 def get_tokenizer(pretrain, model, padding_side="left", strategy=None, use_fast=True):
@@ -70,6 +69,10 @@ def blending_datasets(
             ext = ext.lower().strip(".")
             if ext == "jsonl":
                 data = pd.read_json(dataset, lines=True)
+                with open(dataset, "r") as f:
+                    data = [json.loads(line) for line in f]
+                    keys = {key for item in data for key in item}
+                data = {key: [d[key] if key in d else None for d in data] for key in keys}
                 data = Dataset.from_pandas(data)
             else:
                 data = load_dataset(ext, data_files=dataset)
