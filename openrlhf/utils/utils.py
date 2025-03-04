@@ -1,6 +1,6 @@
 import os
 
-from datasets import interleave_datasets, load_dataset, load_from_disk
+from datasets import interleave_datasets, load_dataset, load_from_disk, Dataset
 from transformers import AutoTokenizer
 
 
@@ -68,8 +68,10 @@ def blending_datasets(
         elif ext in [".json", ".jsonl", ".csv"]:
             ext = ext.lower().strip(".")
             if ext == "jsonl":
-                ext = "json"
-            data = load_dataset(ext, data_files=dataset)
+                data = pd.read_json(dataset, lines=True)
+                data = Dataset.from_pandas(data)
+            else:
+                data = load_dataset(ext, data_files=dataset)
             strategy.print(f"loaded {dataset} with data_files={dataset}")
         # local dataset saved with `datasets.Dataset.save_to_disk`
         elif os.path.isdir(dataset):
