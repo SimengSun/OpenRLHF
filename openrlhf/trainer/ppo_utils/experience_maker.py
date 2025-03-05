@@ -214,7 +214,7 @@ class NaiveExperienceMaker(ABC):
             desc="make_experience",
             disable=not self.strategy.is_rank_0(),
         ):
-            if out_f
+            if out_f:
                 prompts = samples.prompts
                 completions = samples.completion_texts
                 for prompt, completion in zip(prompts, completions):
