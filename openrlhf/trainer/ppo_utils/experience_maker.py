@@ -409,7 +409,8 @@ class NaiveExperienceMaker(ABC):
         elif args.advantage_estimator == "grpo":
             rewards = torch.cat([experience.info["reward"] for experience in experiences])
             rewards = rewards.reshape(-1, args.n_samples_per_prompt).to(device="cuda")
-            max_reward = rewards.max(dim=-1, keepdim=True).values
+            if args.add_max_reward:
+                max_reward = rewards.max(dim=-1, keepdim=True).values
             mean = rewards.mean(dim=-1, keepdim=True)
             std = rewards.std(dim=-1, keepdim=True) + 1e-8
             rewards = (rewards - mean) / std + (max_reward if args.add_max_reward else 0)
