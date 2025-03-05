@@ -233,9 +233,9 @@ class PPOTrainer(ABC):
                 disable=not self.strategy.is_rank_0(),
             )
 
-            for rand_prompts, input_dict in self.prompts_dataloader:
+            for prompt_iter, (rand_prompts, input_dict) in enumerate(self.prompts_dataloader):
                 for i, experience in enumerate(
-                    self.experience_maker.make_experience_list(args.extra_rm_args, (rand_prompts, input_dict), **self.generate_kwargs)
+                    self.experience_maker.make_experience_list(episode, prompt_iter, args.extra_rm_args, (rand_prompts, input_dict), **self.generate_kwargs)
                 ):
                     if i == 0:
                         output = self.tokenizer.batch_decode(

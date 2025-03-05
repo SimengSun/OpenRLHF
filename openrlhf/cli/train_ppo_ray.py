@@ -380,6 +380,7 @@ if __name__ == "__main__":
     parser.add_argument('--no_truncated_prompts', dest='truncated_prompts', action='store_false', default=True, help="Filters out prompts whose length exceeds prompt_max_len and who would otherwise be truncated")
     parser.add_argument("--extra_rm_args", type=str, default="{}")
     parser.add_argument("--buffer_limit", type=int, default=0)
+    parser.add_argument("--experience_output_dir", type=str, default=None)
 
     args = parser.parse_args()
 

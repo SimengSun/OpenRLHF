@@ -1,4 +1,6 @@
+import os
 import json
+import uuid
 import time
 from abc import ABC
 from copy import deepcopy
@@ -117,6 +119,7 @@ class Samples:
     total_length: torch.Tensor
     prompts: list[str]
     prompt_metadata: list[dict]
+    completion_texts: list[str] = None
 
 
 class NaiveExperienceMaker(ABC):
@@ -184,7 +187,7 @@ class NaiveExperienceMaker(ABC):
         return {k: v.to(device) for k, v in batch.items()}
 
     @torch.no_grad()
-    def make_experience_list(self, extra_rm_args, all_prompts: Union[Dict, List[Dict]], **generate_kwargs) -> List[Experience]:
+    def make_experience_list(self, episode, prompt_iter, extra_rm_args, all_prompts: Union[Dict, List[Dict]], **generate_kwargs) -> List[Experience]:
         """
         Make a list of experience with the micro_rollout_batch_size.
 
@@ -197,13 +200,28 @@ class NaiveExperienceMaker(ABC):
         samples_list = self.generate_samples(all_prompts, **generate_kwargs)
         torch.distributed.barrier()
 
+        out_f = None
+        if args.experience_output_dir:
+            try:
+                os.makedirs(args.experience_output_dir, exist_ok=True)
+                out_f = open(os.path.join(args.experience_output_dir, f"experience_{episode}_{prompt_iter}_{str(uuid.uuid4())}.jsonl"), "w")
+            except:
+                logger.warning(f"Failed to create directory {args.experience_output_dir}")
+
         experiences = []
         for samples in tqdm(
             samples_list,
             desc="make_experience",
             disable=not self.strategy.is_rank_0(),
         ):
+            if out_f
+                prompts = samples.prompts
+                completions = samples.completion_texts
+                for prompt, completion in zip(prompts, completions):
+                    print(json.dumps({'prompt' : prompt, 'completion' : completion, 'combined' : prompt + completion}), file=out_f)
             experiences.append(self.make_experience(extra_rm_args, samples).to_device("cpu"))
+        if out_f:
+            out_f.close()
 
         experiences, rewards = self.process_experiences(experiences)
 
@@ -513,14 +531,14 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
             self.custom_reward_func = ray.remote(self.custom_reward_func)
 
     @torch.no_grad()
-    def make_experience_list(self, extra_rm_args, all_prompts: Union[Dict, List[Dict]], **generate_kwargs) -> List[Experience]:
+    def make_experience_list(self, episode, prompt_iter, extra_rm_args, all_prompts: Union[Dict, List[Dict]], **generate_kwargs) -> List[Experience]:
         if self.strategy.args.perf:
             self.perf_stats = {
                 "generate_time": 0,
                 "actor_value_rm_time": 0,
                 "wait_time": 0,
             }
-        experiences = super().make_experience_list(extra_rm_args, all_prompts, **generate_kwargs)
+        experiences = super().make_experience_list(episode, prompt_iter, extra_rm_args, all_prompts, **generate_kwargs)
         if self.critic is not None:
             for experience in experiences:
                 # send experience to critic
@@ -750,6 +768,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         for i in range(0, len(all_outputs), args.micro_rollout_batch_size):
             outputs = all_outputs[i : i + self.strategy.args.micro_rollout_batch_size]
             prompts = all_prompts[i : i + self.strategy.args.micro_rollout_batch_size]
+            gen_texts = [o.text for o in output.outputs]
             cur_metadata = all_prompt_metadata[i : i + self.strategy.args.micro_rollout_batch_size]
             if not self.packing_samples:
                 # NOTE: concat all outputs to following format:
@@ -795,6 +814,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
                         total_length=attention_mask.float().sum(dim=-1),
                         prompts=prompts,
                         prompt_metadata=cur_metadata,
+                        completion_texts=gen_texts,
                     )
                 )
             else:
@@ -834,6 +854,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
                         total_length=total_length,
                         prompts=prompts,
                         prompt_metadata=cur_metadata,
+                        completion_texts=gen_texts,
                     )
                 )
         return samples_list
