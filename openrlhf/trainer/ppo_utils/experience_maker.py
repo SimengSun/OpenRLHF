@@ -768,7 +768,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         for i in range(0, len(all_outputs), args.micro_rollout_batch_size):
             outputs = all_outputs[i : i + self.strategy.args.micro_rollout_batch_size]
             prompts = all_prompts[i : i + self.strategy.args.micro_rollout_batch_size]
-            gen_texts = [o.text for o in output.outputs]
+            gen_texts = [o.text for output in outputs for o in output.outputs]
             cur_metadata = all_prompt_metadata[i : i + self.strategy.args.micro_rollout_batch_size]
             if not self.packing_samples:
                 # NOTE: concat all outputs to following format:
