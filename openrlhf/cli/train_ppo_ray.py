@@ -277,6 +277,7 @@ if __name__ == "__main__":
     parser.add_argument("--value_clip", type=float, default=0.2, help="PPO value clip range")
     parser.add_argument("--lambd", type=float, default=1.0, help="PPO GAE lambd")
     parser.add_argument("--gamma", type=float, default=1, help="PPO GAE gamma")
+    parser.add_argument("--add_max_reward", action="store_true", default=False, help="Add max reward")
     parser.add_argument("--micro_train_batch_size", type=int, default=4, help="batch size per GPU")
     parser.add_argument("--train_batch_size", type=int, default=128, help="Global training batch size")
     parser.add_argument("--limit_val_batches", type=int, default=None, help="Number of batches of validation to run")
