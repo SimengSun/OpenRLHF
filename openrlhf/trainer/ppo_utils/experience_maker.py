@@ -229,7 +229,7 @@ class NaiveExperienceMaker(ABC):
                     generate_kwargs["gamma"],
                     generate_kwargs["lambd"],
                 )
-            elif self.advantage_estimator in ["reinforce", "rloo"]:
+            elif self.advantage_estimator in ["reinforce", "rloo", "grpo"]:
                 experience.returns = self.get_cumulative_returns(
                     reward,
                     experience.action_mask,
@@ -388,6 +388,15 @@ class NaiveExperienceMaker(ABC):
             rewards = rewards - baseline
             rewards = rewards.flatten().to(device="cpu").chunk(len(experiences))
             return experiences, rewards
+        elif args.advantage_estimator == "grpo":
+            rewards = torch.cat([experience.info["reward"] for experience in experiences])
+            rewards = rewards.reshape(-1, args.n_samples_per_prompt).to(device="cuda")
+            mean = rewards.mean(dim=-1, keepdim=True)
+            std = rewards.std(dim=-1, keepdim=True) + 1e-8
+            rewards = (rewards - mean) / std
+            rewards = rewards.flatten().to(device="cpu").chunk(len(experiences))
+            return experiences, rewards
+
         # default rewards
         return experiences, [experience.info["reward"] for experience in experiences]
 
