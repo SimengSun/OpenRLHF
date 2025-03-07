@@ -60,6 +60,7 @@ class Experience:
     action_mask: Optional[torch.BoolTensor]
     info: Optional[dict]
     kl: Optional[torch.Tensor] = None
+    timings : Optional[dict] = None
 
     @torch.no_grad()
     def to_device(self, device: torch.device):
@@ -201,7 +202,7 @@ class NaiveExperienceMaker(ABC):
         torch.distributed.barrier()
 
         out_f = None
-        if args.experience_output_dir:
+        if args.experience_output_dir and (self.strategy.is_rank_0()):
             try:
                 os.makedirs(args.experience_output_dir, exist_ok=True)
                 out_f = open(os.path.join(args.experience_output_dir, f"experience_{episode}_{prompt_iter}_{str(uuid.uuid4())}.jsonl"), "w")
@@ -323,7 +324,9 @@ class NaiveExperienceMaker(ABC):
         num_actions = samples.num_actions
 
         # log probs
+        start_time = time.time()
         action_log_probs = self.actor(sequences, num_actions, attention_mask)
+        timings['time_old_logprob_step'] = time.time() - start_time
 
         # init log probs
         base_action_log_probs = self.initial_model(sequences, num_actions, attention_mask) if self.initial_model is not None else None
@@ -386,6 +389,7 @@ class NaiveExperienceMaker(ABC):
             action_mask,
             info,
             kl,
+            timings,
         )
 
     @torch.no_grad()

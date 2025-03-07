@@ -234,6 +234,7 @@ class PPOTrainer(ABC):
             )
 
             for prompt_iter, (rand_prompts, input_dict) in enumerate(self.prompts_dataloader):
+                timings = defaultdict(list)
                 for i, experience in enumerate(
                     self.experience_maker.make_experience_list(episode, prompt_iter, args.extra_rm_args, (rand_prompts, input_dict), **self.generate_kwargs)
                 ):
@@ -243,6 +244,12 @@ class PPOTrainer(ABC):
                         )
                         self.strategy.print(output)
                     self.replay_buffer.append(experience)
+                    for k, v in experience.timings.items():
+                        timings[k].append(v)
+                for k, v in timings.items():
+                    assert k.endswith('_step')
+                    timings[k[:-5] + '_total'] = sum(v)
+                    timings[k] = sum(v) / len(v)
 
                 torch.cuda.empty_cache()
                 self.replay_buffer.normalize("advantages", self.strategy)
@@ -260,6 +267,7 @@ class PPOTrainer(ABC):
                     "generated_samples": (generated_samples := steps * args.rollout_batch_size * args.n_samples_per_prompt),
                 }
                 status.update(client_states)
+                status.update(timings)
                 self.save_logs_and_checkpoints(args, steps, pbar, status, client_states)
 
                 pbar.update()
@@ -368,7 +376,8 @@ class PPOTrainer(ABC):
                     mask = s != -99999
                     s = s[mask]
                     status_mean[k] = s.mean().item() if s.numel() > 0 else float('nan')
-                else:
+                elif k == 'time_actor_step':
+                    status_mean['time_actor_total'] = status_mean[k]
                     status_mean[k] /= len(status_list)
         for k, v in status_mean.items():
             if k.startswith('metric_'):
@@ -601,7 +610,7 @@ class PPOTrainer(ABC):
             self._save_checkpoint(args, tag, client_states)
 
         # Run eval after check for checkpoint  save in case checkpoint save comes at the end of the job
-        if global_step % args.eval_steps == 0 and self.eval_dataloader is not None:
+        if ((args.eval_on_start and (global_step == 1)) or (global_step % args.eval_steps == 0)) and self.eval_dataloader is not None:
             logs_dict = self.evaluate(self.eval_dataloader, global_step, args.extra_rm_args)
             if self._wandb is not None and self.strategy.is_rank_0():
                 logs = {
