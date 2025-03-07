@@ -234,7 +234,6 @@ class PPOTrainer(ABC):
             )
 
             for prompt_iter, (rand_prompts, input_dict) in enumerate(self.prompts_dataloader):
-                timings = defaultdict(list)
                 for i, experience in enumerate(
                     self.experience_maker.make_experience_list(episode, prompt_iter, args.extra_rm_args, (rand_prompts, input_dict), **self.generate_kwargs)
                 ):
@@ -244,13 +243,6 @@ class PPOTrainer(ABC):
                         )
                         self.strategy.print(output)
                     self.replay_buffer.append(experience)
-                    for k, v in experience.timings.items():
-                        timings[k].append(v)
-                for k, v in timings.items():
-                    assert k.endswith('_step')
-                    v = torch.cat(v)
-                    timings[k[:-5] + '_total'] = v.sum().item()
-                    timings[k] = v.mean().item()
 
                 torch.cuda.empty_cache()
                 self.replay_buffer.normalize("advantages", self.strategy)
@@ -482,6 +474,11 @@ class PPOTrainer(ABC):
                 status[k] = v.mean().item()
 
         status['time_actor_step'] = time.time() - start_time
+        perf_stats = self.experience_maker.perf_stats
+        if perf_stats is not None:
+            if 'time_actor_total' not in perf_stats:
+                perf_stats['time_actor_total'] = 0
+            perf_stats['time_actor_total'] += status['time_actor_step']
         return status
 
     def training_step_critic(self, experience: Experience) -> Dict[str, float]:

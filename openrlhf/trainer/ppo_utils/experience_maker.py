@@ -642,7 +642,9 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
                     r_refs.append(r)
 
         # log probs
+        action_log_probs_start_time = time.time()
         action_log_probs = self.actor(sequences, num_actions, attention_mask, packed_seq_lens=packed_seq_lens)
+        action_log_probs_time = time.time() - action_log_probs_start_time
         actor_value_rm_time = time.time() - start
 
         # wait initial/critic/reward model done
@@ -714,6 +716,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
 
         if self.strategy.args.perf:
             self.perf_stats["actor_value_rm_time"] += actor_value_rm_time
+            self.perf_stats["action_log_probs_time"] += action_log_probs_time
             self.perf_stats["wait_time"] += wait_time
 
         experience = Experience(
