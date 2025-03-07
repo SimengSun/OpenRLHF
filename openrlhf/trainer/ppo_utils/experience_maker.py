@@ -219,7 +219,7 @@ class NaiveExperienceMaker(ABC):
                 completions = samples.completion_texts
                 for prompt, completion in zip(prompts, completions):
                     print(json.dumps({'prompt' : prompt, 'completion' : completion, 'combined' : prompt + completion}), file=out_f)
-            experiences.append(self.make_experience(extra_rm_args, samples).to_device("cpu"))
+            experiences.append(self.make_experience(extra_rm_args, samples, evaluation=(episode=='eval')).to_device("cpu"))
         if out_f:
             out_f.close()
 
@@ -304,12 +304,10 @@ class NaiveExperienceMaker(ABC):
         return samples_list
 
     @torch.no_grad()
-    def make_experience(self, extra_rm_args, samples: Samples) -> Experience:
+    def make_experience(self, extra_rm_args, samples: Samples, evaluation=False) -> Experience:
         """
         Turn samples into experience by calculating logprobs, values, rewards, and kl divergence.
         """
-
-        timings = {}
 
         self.actor.eval()
         if self.initial_model is not None:
@@ -328,7 +326,7 @@ class NaiveExperienceMaker(ABC):
         # log probs
         start_time = time.time()
         action_log_probs = self.actor(sequences, num_actions, attention_mask)
-        timings['time_old_logprob_step'] = torch.tensor([time.time() - start_time])
+        old_logprob_time = time.time() - start_time
 
         # init log probs
         base_action_log_probs = self.initial_model(sequences, num_actions, attention_mask) if self.initial_model is not None else None
@@ -391,7 +389,6 @@ class NaiveExperienceMaker(ABC):
             action_mask,
             info,
             kl,
-            timings,
         )
 
     @torch.no_grad()
@@ -570,7 +567,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         return self._generate_vllm(all_prompts, **generate_kwargs)
 
     @torch.no_grad()
-    def make_experience(self, extra_rm_args, samples: Samples) -> Experience:
+    def make_experience(self, extra_rm_args, samples: Samples, evaluation=False) -> Experience:
         """
         Turn samples into experience by calculating logprobs, values, rewards, and kl divergence.
         """
@@ -591,13 +588,13 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         )
 
         # init log probs
-        if self.initial_model is not None:
+        if (self.initial_model is not None) and (not evaluation):
             base_action_log_probs_ref = self.initial_model.forward.remote(
                 sequences_cpu, num_actions, attention_mask_cpu, packed_seq_lens=packed_seq_lens
             ) if self.initial_model is not None else None
 
         # values
-        if self.critic is not None:
+        if (self.critic is not None) and (not evaluation):
             value_ref = self.critic.forward.remote(
                 sequences_cpu, num_actions, attention_mask_cpu, packed_seq_lens=packed_seq_lens
             )
@@ -608,7 +605,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         else:
             value_ref = ray.put(None)
 
-        if self.strategy.args.colocate_actor_ref and (self.initial_model is not None):
+        if self.strategy.args.colocate_actor_ref and (self.initial_model is not None) and (not evaluation):
             ray.get([base_action_log_probs_ref])
             ray.get([self.initial_model.empty_cache.remote()])
 
@@ -640,9 +637,13 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
                     r_refs.append(r)
 
         # log probs
-        action_log_probs_start_time = time.time()
-        action_log_probs = self.actor(sequences, num_actions, attention_mask, packed_seq_lens=packed_seq_lens)
-        action_log_probs_time = time.time() - action_log_probs_start_time
+        action_log_probs_start_time = 0
+        if not evaluation:
+            action_log_probs_start_time = time.time()
+            action_log_probs = self.actor(sequences, num_actions, attention_mask, packed_seq_lens=packed_seq_lens)
+            action_log_probs_time = time.time() - action_log_probs_start_time
+        else:
+            action_log_probs = torch.zeros_like(sequences)
         actor_value_rm_time = time.time() - start
 
         # wait initial/critic/reward model done
@@ -679,7 +680,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         if self.strategy.args.colocate_actor_ref:
             torch.cuda.empty_cache()
 
-        if self.initial_model is not None:
+        if (self.initial_model is not None) and (not evaluation):
             kl = compute_approx_kl(
                 action_log_probs,
                 base_action_log_probs,
