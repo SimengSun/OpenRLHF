@@ -222,6 +222,19 @@ class PPOTrainer(ABC):
         start_episode = consumed_samples // args.rollout_batch_size // num_rollouts_per_episodes
         consumed_samples = consumed_samples % (num_rollouts_per_episodes * args.rollout_batch_size)
 
+        # Run eval after check for checkpoint  save in case checkpoint save comes at the end of the job
+        if args.eval_on_start and (self.eval_dataloader is not None):
+            logs_dict = self.evaluate(self.eval_dataloader, 0, args.extra_rm_args)
+            if self._wandb is not None and self.strategy.is_rank_0():
+                logs = {
+                    "eval/%s" % k: v
+                    for k, v in {
+                        **logs_dict,
+                        "global_step": global_step,
+                    }.items()
+                }
+                self._wandb.log(logs)
+
         for episode in range(start_episode, args.num_episodes):
             if isinstance(self.prompts_dataloader.sampler, DistributedSampler):
                 self.prompts_dataloader.sampler.set_epoch(
@@ -609,7 +622,7 @@ class PPOTrainer(ABC):
             self._save_checkpoint(args, tag, client_states)
 
         # Run eval after check for checkpoint  save in case checkpoint save comes at the end of the job
-        if ((args.eval_on_start and (global_step == 1)) or (global_step % args.eval_steps == 0)) and self.eval_dataloader is not None:
+        if (global_step % args.eval_steps == 0) and (self.eval_dataloader is not None):
             logs_dict = self.evaluate(self.eval_dataloader, global_step, args.extra_rm_args)
             if self._wandb is not None and self.strategy.is_rank_0():
                 logs = {
