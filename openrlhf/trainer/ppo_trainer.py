@@ -248,8 +248,9 @@ class PPOTrainer(ABC):
                         timings[k].append(v)
                 for k, v in timings.items():
                     assert k.endswith('_step')
-                    timings[k[:-5] + '_total'] = sum(v)
-                    timings[k] = sum(v) / len(v)
+                    v = torch.cat(v)
+                    timings[k[:-5] + '_total'] = v.sum().item()
+                    timings[k] = v.mean().item()
 
                 torch.cuda.empty_cache()
                 self.replay_buffer.normalize("advantages", self.strategy)

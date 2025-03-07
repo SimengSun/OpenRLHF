@@ -73,6 +73,7 @@ class Experience:
         self.action_mask = to(self.action_mask, device)
         self.kl = to(self.kl, device)
         self.info = {key: to(value, device) for key, value in self.info.items()}
+        self.timings = {key: to(value, device) for key, value in self.timings.items()}
         return self
 
     def pin_memory(self):
@@ -85,6 +86,7 @@ class Experience:
         self.action_mask = pin_memory(self.action_mask)
         self.kl = pin_memory(self.kl)
         self.info = {key: pin_memory(value) for key, value in self.info.items()}
+        self.timings = {key: pin_memory(value) for key, value in self.timings.items()}
         return self
 
 
@@ -309,6 +311,9 @@ class NaiveExperienceMaker(ABC):
         """
         Turn samples into experience by calculating logprobs, values, rewards, and kl divergence.
         """
+
+        timings = {}
+
         self.actor.eval()
         if self.initial_model is not None:
             self.initial_model.eval()
@@ -326,7 +331,7 @@ class NaiveExperienceMaker(ABC):
         # log probs
         start_time = time.time()
         action_log_probs = self.actor(sequences, num_actions, attention_mask)
-        timings['time_old_logprob_step'] = time.time() - start_time
+        timings['time_old_logprob_step'] = torch.tensor([time.time() - start_time])
 
         # init log probs
         base_action_log_probs = self.initial_model(sequences, num_actions, attention_mask) if self.initial_model is not None else None
