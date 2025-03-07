@@ -547,6 +547,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
             self.perf_stats = {
                 "generate_time": 0,
                 "actor_value_rm_time": 0,
+                "action_log_probs_time": 0,
                 "wait_time": 0,
             }
         experiences = super().make_experience_list(episode, prompt_iter, extra_rm_args, all_prompts, **generate_kwargs)
