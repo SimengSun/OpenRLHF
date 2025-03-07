@@ -260,7 +260,6 @@ class PPOTrainer(ABC):
                     "generated_samples": (generated_samples := steps * args.rollout_batch_size * args.n_samples_per_prompt),
                 }
                 status.update(client_states)
-                status.update(timings)
                 self.save_logs_and_checkpoints(args, steps, pbar, status, client_states)
 
                 pbar.update()
