@@ -60,7 +60,6 @@ class Experience:
     action_mask: Optional[torch.BoolTensor]
     info: Optional[dict]
     kl: Optional[torch.Tensor] = None
-    timings : Optional[dict] = None
 
     @torch.no_grad()
     def to_device(self, device: torch.device):
@@ -73,7 +72,6 @@ class Experience:
         self.action_mask = to(self.action_mask, device)
         self.kl = to(self.kl, device)
         self.info = {key: to(value, device) for key, value in self.info.items()}
-        self.timings = {key: to(value, device) for key, value in self.timings.items()}
         return self
 
     def pin_memory(self):
@@ -86,7 +84,6 @@ class Experience:
         self.action_mask = pin_memory(self.action_mask)
         self.kl = pin_memory(self.kl)
         self.info = {key: pin_memory(value) for key, value in self.info.items()}
-        self.timings = {key: pin_memory(value) for key, value in self.timings.items()}
         return self
 
 
