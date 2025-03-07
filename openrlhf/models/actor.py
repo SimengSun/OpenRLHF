@@ -12,6 +12,57 @@ from .ring_attn_utils import convert_ring_attn_params
 from .utils import log_probs_from_logits, reset_position_ids
 
 
+def compute_attention_rollout(
+    all_attentions,
+    add_identity: bool = True,
+    start_layer: int = 0
+):
+    """
+    all_attentions:
+        A list (or tuple) of length L of attention tensors, 
+        where each entry has shape [batch_size, n_heads, seq_len, seq_len].
+        Typically this is model_outputs.attentions returned by a HF model.
+    add_identity:
+        If True, adds the identity matrix to each layer's attention 
+        before normalizing (simulates residual connections).
+    start_layer:
+        If you want to skip the first `start_layer` layers 
+        and only compute rollout from layer `start_layer` upwards.
+
+    Returns:
+        A tensor of shape [batch_size, seq_len, seq_len], 
+        which is the rolled-out attention from the chosen start layer 
+        through the top layer.
+    """
+    # Number of layers
+    num_layers = len(all_attentions)
+    # We assume all layers have the same batch_size, seq_len
+    batch_size, n_heads, seq_len, _ = all_attentions[0].shape
+
+    # Initialize rollout with the identity for each batch
+    # so that we can do a matrix multiply from the bottom up
+    rollout = torch.eye(seq_len).unsqueeze(0).repeat(batch_size, 1, 1)
+    rollout = rollout.to(all_attentions[0].device)
+
+    # Multiply in sequence from start_layer to the last layer
+    for layer_idx in range(start_layer, num_layers):
+        # 1) average across heads -> shape: [batch_size, seq_len, seq_len]
+        attn_avg = all_attentions[layer_idx].mean(dim=1)
+
+        # 2) optionally add identity
+        if add_identity:
+            attn_avg = attn_avg + torch.eye(seq_len).to(attn_avg.device)
+
+        # 3) row-normalize (each row sums to 1)
+        attn_avg = attn_avg / attn_avg.sum(dim=-1, keepdim=True)
+
+        # 4) matrix multiply
+        rollout = torch.bmm(rollout, attn_avg)
+
+    return rollout
+
+
+
 class Actor(nn.Module):
     """
     Base class for Actor models in reinforcement learning.

@@ -362,6 +362,7 @@ class PPOTrainer(ABC):
                             status_mean[k] = 0
                     assert not k.startswith('metric_') or type(status_mean[k]) == list, f'{k}; {type(status_mean[k])}'
                     status_mean[k] += v
+            time_actor_total = 0
             for k in status_mean.keys():
                 if type(status_mean[k]) == list:
                     s = torch.cat(status_mean[k])
@@ -370,8 +371,10 @@ class PPOTrainer(ABC):
                     s = s[mask]
                     status_mean[k] = s.mean().item() if s.numel() > 0 else float('nan')
                 elif k == 'time_actor_step':
+                    time_actor_total = status_mean[k]
                     status_mean['time_actor_total'] = status_mean[k]
                     status_mean[k] /= len(status_list)
+            status_mean['time_actor_total'] = time_actor_total
         for k, v in status_mean.items():
             if k.startswith('metric_'):
                 assert type(status_mean[k]) == float, f'{k}; {type(status_mean[k])}; {status_mean[k]}'
