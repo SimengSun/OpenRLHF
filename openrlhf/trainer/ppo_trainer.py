@@ -554,7 +554,7 @@ class PPOTrainer(ABC):
         logs_dict = {}
         for prompts, input_dict in dataloader:
             for i, experience in enumerate(
-                self.experience_maker.make_experience_list(extra_rm_args, (prompts, input_dict), **eval_generate_kwargs)
+                self.experience_maker.make_experience_list('eval', global_step, extra_rm_args, (prompts, input_dict), **eval_generate_kwargs)
             ):
                 status = {k : v for k, v in experience.info.items() if (k == 'reward') or k.startswith('metric_')}
                 status = self.strategy.all_gather(status)
