@@ -230,7 +230,7 @@ class PPOTrainer(ABC):
                     "eval/%s" % k: v
                     for k, v in {
                         **logs_dict,
-                        "global_step": global_step,
+                        "global_step": 0,
                     }.items()
                 }
                 self._wandb.log(logs)
